@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 
 // ─── DATA ───────────────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ function calcGroupStandingsRaw(group, groupResults) {
 
 // ─── SCORE CALCULATION ───────────────────────────────────────────────────────
 
-function calcScore(player, results, groupRankings) {
+function calcScore(player, results) {
   let total = 0;
   const detail = {};
 
@@ -176,11 +176,12 @@ function calcScore(player, results, groupRankings) {
     }
   });
 
-  // Classement de groupe — déduit automatiquement des scores pronostiqués
+  // Classement de groupe — comparaison classement pronostiqué vs classement réel calculé
   Object.keys(GROUPS).forEach(group => {
-    const realRanks = groupRankings?.[group];
-    if (!realRanks) return;
-    // Reconstruit le classement pronostiqué depuis les scores saisis
+    // Classement réel calculé automatiquement depuis les vrais scores
+    const realStandings = calcGroupStandingsRaw(group, results?.groupResults || {});
+    if (!realStandings.some(s => s.played > 0)) return; // groupe pas encore joué
+    // Classement pronostiqué déduit des scores saisis par le joueur
     const fakePreds = {};
     (player.predictions || []).forEach(pred => {
       if (pred.home !== "" && pred.away !== "" && !isNaN(parseInt(pred.home)) && !isNaN(parseInt(pred.away))) {
@@ -189,7 +190,7 @@ function calcScore(player, results, groupRankings) {
     });
     const predStandings = calcGroupStandingsRaw(group, fakePreds);
     predStandings.forEach((s, idx) => {
-      if (realRanks[idx] === s.team) {
+      if (realStandings[idx]?.team === s.team) {
         total += 2;
         detail[`rank_${group}_${idx}`] = 2;
       }
@@ -435,7 +436,7 @@ function NavBtn({ label, onClick, active }) {
 
 function HomeScreen({ setScreen, players, results }) {
   const ranked = [...players]
-    .map(p => ({ ...p, score: calcScore(p, results, results.groupRankings).total }))
+    .map(p => ({ ...p, score: calcScore(p, results).total }))
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
@@ -674,7 +675,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const globalLocked = !!results.locked;
   const locked = isLocked || globalLocked;
 
-  const { total, detail } = calcScore(player, results, results.groupRankings);
+  const { total, detail } = calcScore(player, results);
 
   function saveDraft() {
     if (locked) return;
@@ -1484,7 +1485,7 @@ function BonusTab({ player, results, detail }) {
 
 function LeaderboardScreen({ players, results, compact = false }) {
   const ranked = [...players]
-    .map(p => ({ ...p, score: calcScore(p, results, results.groupRankings).total }))
+    .map(p => ({ ...p, score: calcScore(p, results).total }))
     .sort((a, b) => b.score - a.score);
 
   const pot = players.length * 2;
