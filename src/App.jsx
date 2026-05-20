@@ -1529,11 +1529,12 @@ function GrillesScreen({ players, results, currentPlayer }) {
   const [selectedId, setSelectedId] = useState(null);
 
   // Seuls les joueurs ayant verrouillé leur grille sont visibles
-  const lockedPlayers = players.filter(p => p.locked);
+  // Joueurs visibles : grille poules verrouillée OU au moins une phase finale verrouillée
+  const lockedPlayers = players.filter(p => p.locked || (p.lockedKoPhases && p.lockedKoPhases.length > 0));
   const selected = players.find(p => p.id === selectedId);
 
   // Condition d'accès : être connecté et avoir verrouillé sa propre grille
-  const canView = currentPlayer && currentPlayer.locked;
+  const canView = currentPlayer && (currentPlayer.locked || (currentPlayer.lockedKoPhases && currentPlayer.lockedKoPhases.length > 0));
 
   if (!currentPlayer) return (
     <div style={styles.formWrap}>
@@ -1549,7 +1550,7 @@ function GrillesScreen({ players, results, currentPlayer }) {
       <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: 16 }}>
         <p style={{ color: "#f97316", fontWeight: 700, margin: "0 0 8px" }}>🔒 Accès verrouillé</p>
         <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
-          Tu dois <strong style={{ color: C.text }}>valider définitivement ta grille</strong> avant de pouvoir consulter les pronostics des autres joueurs.
+          Tu dois <strong style={{ color: C.text }}>valider définitivement ta grille de poules ou une phase finale</strong> avant de pouvoir consulter les pronostics des autres joueurs.
           Cela évite que les grilles des autres influencent tes propres choix !
         </p>
       </div>
@@ -1575,6 +1576,36 @@ function GrillesScreen({ players, results, currentPlayer }) {
         <div style={{ fontSize: 13, padding: "4px 0" }}>🏆 Vainqueur : <strong>{flag(selected.bonusPredictions?.winner || "")} {selected.bonusPredictions?.winner || "—"}</strong></div>
         <div style={{ fontSize: 13, padding: "4px 0" }}>⚽ Meilleur buteur : <strong>{selected.bonusPredictions?.topScorer || "—"}</strong></div>
       </div>
+
+      {/* Pronos phase finale */}
+      {["R16","QF","SF","F"].map(phase => {
+        const phasePreds = selected.koPredictions?.[phase] || [];
+        const phaseResults = results.koResults?.[phase] || {};
+        const phaseLabel = { R16:"Seizièmes", QF:"Huitièmes", SF:"Demi-finales", F:"Finale" }[phase];
+        const isLocked = (selected.lockedKoPhases || []).includes(phase);
+        if (!isLocked || phasePreds.length === 0) return null;
+        const { detail } = calcScore(selected, results);
+        return (
+          <div key={phase} style={styles.groupSection}>
+            <h3 style={styles.groupTitle}>🏆 {phaseLabel}</h3>
+            {phasePreds.filter(p => p.winner).map(pred => {
+              const real = phaseResults[pred.matchId];
+              const pts = detail[`ko_${phase}_${pred.matchId}`];
+              return (
+                <div key={pred.matchId} style={{ display:"flex", alignItems:"center", gap:8, padding:"5px 0", borderBottom:`1px solid ${C.border}`, fontSize:12, flexWrap:"wrap" }}>
+                  <span style={{ flex:1 }}>
+                    {flag(pred.winner)} <strong>{pred.winner}</strong>
+                    {pred.homeScore !== undefined && pred.homeScore !== "" && <span style={{ color:C.textMuted }}> ({pred.homeScore}–{pred.awayScore})</span>}
+                  </span>
+                  {real?.winner && <span style={{ color:C.textMuted }}>Réel : {flag(real.winner)} {real.winner}</span>}
+                  {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts>=3?"#22c55e":pts===2?"#f59e0b":"#ef4444" }}>{pts>=3?"🎯+3":pts===2?"✅+2":"❌0"}</span>}
+                  {!real?.winner && <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
 
       {/* Scores de poules — groupes avec résultats */}
       {Object.entries(GROUPS).map(([group]) => {
