@@ -472,10 +472,14 @@ function HomeScreen({ setScreen, players, results }) {
         <div style={styles.card}>
           <div style={styles.cardIcon}>💰</div>
           <div style={styles.cardLabel}>Cagnotte</div>
-          <div style={styles.cardValue}>{pot}€</div>
+          <div style={styles.cardValue}>${pot}€</div>
           <div style={styles.cardSub}>
-            🥇 {prizes[0]}€ · 🥈 {prizes[1]}€ · 🥉 {prizes[2]}€
+            🥇 ${prizes[0]}€ · 🥈 ${prizes[1]}€ · 🥉 ${prizes[2]}€
           </div>
+          <a href="https://www.leetchi.com/fr/c/pronostics-cdm-2026-5340795" target="_blank" rel="noopener noreferrer"
+            style={{ display:"block", marginTop:8, background:"#22c55e", color:"#fff", borderRadius:8, padding:"7px 10px", fontSize:12, fontWeight:700, textDecoration:"none", textAlign:"center" }}>
+            💳 Participer →
+          </a>
         </div>
         <div style={styles.card}>
           <div style={styles.cardIcon}>👥</div>
@@ -1688,7 +1692,13 @@ function LeaderboardScreen({ players, results, compact = false }) {
   return (
     <div style={styles.lbWrap}>
       <h2 style={styles.formTitle}>🏆 Classement général</h2>
-      <div style={styles.potLine}>Cagnotte totale : <strong>{pot}€</strong> · 🥇{prizes[0]}€ 🥈{prizes[1]}€ 🥉{prizes[2]}€</div>
+      <div style={styles.potLine}>
+        Cagnotte totale : <strong>{pot}€</strong> · 🥇{prizes[0]}€ 🥈{prizes[1]}€ 🥉{prizes[2]}€
+        <a href="https://www.leetchi.com/fr/c/pronostics-cdm-2026-5340795" target="_blank" rel="noopener noreferrer"
+          style={{ marginLeft:10, color:"#22c55e", fontSize:12, fontWeight:700 }}>
+          💳 Leetchi →
+        </a>
+      </div>
       {(br.winner || br.topScorer) && (
         <div style={styles.bonusResultsBox}>
           {br.winner && <span>🏆 Vainqueur : <strong>{flag(br.winner)} {br.winner}</strong></span>}
