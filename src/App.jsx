@@ -1579,7 +1579,6 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
         <button style={{ ...styles.tab, ...(tab === "bonus" ? styles.tabActive : {}) }} onClick={() => setTab("bonus")}>🌟 Bonus</button>
         <button style={{ ...styles.tab, ...(tab === "players" ? styles.tabActive : {}) }} onClick={() => setTab("players")}>👥 Joueurs</button>
         <button style={{ ...styles.tab, ...(tab === "detail" ? styles.tabActive : {}) }} onClick={() => setTab("detail")}>🔍 Détail points</button>
-        <button style={{ ...styles.tab, ...(tab === "bracket" ? styles.tabActive : {}) }} onClick={() => setTab("bracket")}>🏆 Tableau KO</button>
         <button style={{ ...styles.tab, ...(tab === "test" ? styles.tabActive : {}), borderColor: "#7c3aed" }} onClick={() => setTab("test")}>🧪 Test</button>
       </div>
       {tab === "scores" && <AdminScores results={results} updateResults={updateResults} />}
@@ -1589,7 +1588,6 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
       {tab === "bonus" && <AdminBonus results={results} updateResults={updateResults} />}
       {tab === "players" && <AdminPlayers players={players} updatePlayers={updatePlayers} />}
       {tab === "detail" && <AdminDetail players={players} results={results} />}
-      {tab === "bracket" && <AdminBracket results={results} updateResults={updateResults} />}
       {tab === "test" && <AdminTest results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
     </div>
   );
@@ -1636,37 +1634,75 @@ function AdminScores({ results, updateResults }) {
 }
 
 function AdminRankings({ results, updateResults }) {
-  const [local, setLocal] = useState(results.groupRankings || {});
+  // Calcule les classements depuis les scores saisis, avec overrides manuels possibles
+  const [overrides, setOverrides] = useState(results.groupRankings || {});
   const [saved, setSaved] = useState(false);
 
   function save() {
-    updateResults({ ...results, groupRankings: local });
+    updateResults({ ...results, groupRankings: overrides });
     setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  function resetGroup(group) {
+    setOverrides(o => { const n = {...o}; delete n[group]; return n; });
   }
 
   return (
     <div>
-      <p style={styles.hint}>Saisissez le classement final de chaque groupe (1er → 4e).</p>
-      {Object.entries(GROUPS).map(([group, teams]) => (
-        <div key={group} style={styles.groupSection}>
-          <h3 style={styles.groupTitle}>Groupe {group}</h3>
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} style={styles.matchRow}>
-              <span style={styles.rankPos}>{i + 1}e</span>
-              <select style={styles.select}
-                value={local[group]?.[i] || ""}
-                onChange={e => setLocal(l => {
-                  const arr = [...(l[group] || ["", "", "", ""])];
-                  arr[i] = e.target.value;
-                  return { ...l, [group]: arr };
-                })}>
-                <option value="">-- Choisir --</option>
-                {teams.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
-              </select>
+      <p style={styles.hint}>
+        Classements calculés <strong style={{color:C.text}}>automatiquement</strong> depuis les scores saisis.
+        Tu peux corriger manuellement si besoin (ex: meilleur 3e mal calculé).
+      </p>
+      {Object.entries(GROUPS).map(([group, teams]) => {
+        const autoStandings = calcGroupStandings(group, results.groupResults);
+        const hasScores = autoStandings.some(s => s.played > 0);
+        const override = overrides[group];
+        const display = override || autoStandings.map(s => s.team);
+
+        return (
+          <div key={group} style={styles.groupSection}>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8}}>
+              <h3 style={{...styles.groupTitle, margin:0}}>Groupe {group}</h3>
+              <div style={{display:"flex", gap:6, alignItems:"center"}}>
+                {!hasScores && <span style={{fontSize:11, color:C.textMuted}}>En attente des scores</span>}
+                {override && (
+                  <button style={{...styles.btnSecondary, fontSize:11, padding:"3px 8px"}}
+                    onClick={() => resetGroup(group)}>↩ Auto</button>
+                )}
+              </div>
             </div>
-          ))}
-        </div>
-      ))}
+            {[0,1,2,3].map(i => {
+              const autoTeam = autoStandings[i]?.team;
+              const pts = autoStandings[i]?.pts ?? 0;
+              const gd = autoStandings[i]?.gd ?? 0;
+              const isOverridden = override && override[i] !== autoTeam;
+              return (
+                <div key={i} style={{...styles.matchRow, background: isOverridden ? "#1a1208" : "transparent"}}>
+                  <span style={{...styles.rankPos, color: i<2 ? "#22c55e" : i===2 ? "#f59e0b" : C.textMuted}}>
+                    {i+1}
+                  </span>
+                  <select style={{...styles.select, flex:1,
+                    borderColor: isOverridden ? "#f59e0b" : C.border}}
+                    value={display[i] || ""}
+                    onChange={e => {
+                      const arr = [...(override || autoStandings.map(s=>s.team))];
+                      arr[i] = e.target.value;
+                      setOverrides(o => ({...o, [group]: arr}));
+                    }}>
+                    {teams.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
+                  </select>
+                  {hasScores && !override && (
+                    <span style={{fontSize:11, color:C.textMuted, minWidth:80, textAlign:"right"}}>
+                      {pts} pts · {gd>=0?"+":""}{gd} DB
+                    </span>
+                  )}
+                  {isOverridden && <span style={{fontSize:10, color:"#f59e0b"}}>✏️ modifié</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
       <button style={styles.btnPrimary} onClick={save}>{saved ? "✅ Sauvegardé !" : "💾 Sauvegarder les classements"}</button>
     </div>
   );
@@ -1675,6 +1711,18 @@ function AdminRankings({ results, updateResults }) {
 function AdminKO({ results, updateResults }) {
   const [local, setLocal] = useState(results.koResults || {});
   const [saved, setSaved] = useState(false);
+
+  // Calcule les qualifiés depuis les vrais scores + overrides de classement
+  const qualified = calcQualified(results.groupResults);
+  const certain = calcCertainQualified(results.groupResults);
+
+  // Vainqueurs déjà saisis pour la propagation
+  const savedWinners = {};
+  ["R16","QF","SF","F"].forEach(phase => {
+    Object.entries(local[phase] || {}).forEach(([mid, v]) => {
+      if (v?.winner) savedWinners[mid] = v.winner;
+    });
+  });
 
   function save() {
     updateResults({ ...results, koResults: local });
@@ -1691,6 +1739,13 @@ function AdminKO({ results, updateResults }) {
     }));
   }
 
+  const allPhases = [
+    { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
+    { key: "QF",  label: "Huitièmes de finale", bracket: QF_BRACKET },
+    { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
+    { key: "F",   label: "Finale",               bracket: F_BRACKET },
+  ];
+
   return (
     <div>
       <div style={styles.koRuleBox}>
@@ -1698,45 +1753,66 @@ function AdminKO({ results, updateResults }) {
         <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4, lineHeight: 1.6 }}>
           • Score = score à la fin du temps réglementaire <strong>ou des prolongations</strong><br/>
           • Cocher "TAB" si le match a été décidé aux tirs au but<br/>
-          • Vainqueur = équipe qualifiée (même si TAB)
+          • Vainqueur = équipe qualifiée (même si TAB)<br/>
+          • Les équipes sont <strong>calculées automatiquement</strong> depuis les résultats de poules
         </div>
       </div>
-      {KO_PHASES.map(phase => {
-        const slots = Array.from({ length: phase.matches }, (_, i) => ({ matchId: `${phase.key}_${i + 1}`, label: `Match ${i + 1}` }));
-        return (
-          <div key={phase.key} style={styles.groupSection}>
-            <h3 style={styles.groupTitle}>{phase.label}</h3>
-            {slots.map(slot => {
-              const m = local[phase.key]?.[slot.matchId] || {};
-              return (
-                <div key={slot.matchId} style={styles.koMatchRow}>
-                  <div style={styles.koMatchHeader}>
-                    <span style={styles.koLabel}>{slot.label}</span>
-                    <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#94a3b8", cursor: "pointer" }}>
-                      <input type="checkbox" checked={!!m.penalties}
-                        onChange={e => setField(phase.key, slot.matchId, "penalties", e.target.checked)} />
-                      TAB (tirs au but)
-                    </label>
-                  </div>
-                  <div style={styles.koMatchInputs}>
-                    <input style={{ ...styles.scoreInput, width: 48 }} type="number" min="0" max="20" placeholder="–"
-                      value={m.homeScore ?? ""}
-                      onChange={e => setField(phase.key, slot.matchId, "homeScore", e.target.value)} />
-                    <span style={styles.vs}>–</span>
-                    <input style={{ ...styles.scoreInput, width: 48 }} type="number" min="0" max="20" placeholder="–"
-                      value={m.awayScore ?? ""}
-                      onChange={e => setField(phase.key, slot.matchId, "awayScore", e.target.value)} />
-                    <span style={styles.koSep}>Vainqueur :</span>
-                    <input style={{ ...styles.koInput, flex: 1 }} placeholder="Équipe qualifiée"
-                      value={m.winner || ""}
-                      onChange={e => setField(phase.key, slot.matchId, "winner", e.target.value)} />
-                  </div>
+      {allPhases.map(({ key, label, bracket }) => (
+        <div key={key} style={styles.groupSection}>
+          <h3 style={styles.groupTitle}>{label}</h3>
+          {bracket.map((match, idx) => {
+            const m = local[key]?.[match.id] || {};
+            // Résolution des équipes depuis les qualifiés calculés
+            const homeTeam = resolveSlot(match.home, certain, savedWinners);
+            const awayTeam = resolveSlot(match.away, certain, savedWinners);
+            const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
+            return (
+              <div key={match.id} style={styles.koMatchRow}>
+                <div style={styles.koMatchHeader}>
+                  {/* Affichage des équipes */}
+                  <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
+                    {homeTeam
+                      ? <>{flag(homeTeam)} {homeTeam}</>
+                      : <span style={{ color: C.textMuted, fontSize: 11 }}>{slotLabel(match.home)}</span>
+                    }
+                    <span style={{ color: C.textMuted, margin: "0 6px", fontWeight: 400 }}>vs</span>
+                    {awayTeam
+                      ? <>{flag(awayTeam)} {awayTeam}</>
+                      : <span style={{ color: C.textMuted, fontSize: 11 }}>{slotLabel(match.away)}</span>
+                    }
+                  </span>
+                  <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#94a3b8", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!m.penalties}
+                      onChange={e => setField(key, match.id, "penalties", e.target.checked)} />
+                    TAB
+                  </label>
                 </div>
-              );
-            })}
-          </div>
-        );
-      })}
+                <div style={styles.koMatchInputs}>
+                  <input style={{ ...styles.scoreInput, width: 52 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
+                    value={m.homeScore ?? ""}
+                    onChange={e => setField(key, match.id, "homeScore", e.target.value)} />
+                  <span style={styles.vs}>–</span>
+                  <input style={{ ...styles.scoreInput, width: 52 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
+                    value={m.awayScore ?? ""}
+                    onChange={e => setField(key, match.id, "awayScore", e.target.value)} />
+                  <span style={styles.koSep}>Vainqueur :</span>
+                  {teamsForMatch.length === 2
+                    ? <select style={{ ...styles.select, flex: 1 }}
+                        value={m.winner || ""}
+                        onChange={e => setField(key, match.id, "winner", e.target.value)}>
+                        <option value="">-- Choisir --</option>
+                        {teamsForMatch.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
+                      </select>
+                    : <input style={{ ...styles.koInput, flex: 1 }} placeholder="Équipe qualifiée"
+                        value={m.winner || ""}
+                        onChange={e => setField(key, match.id, "winner", e.target.value)} />
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
       <button style={styles.btnPrimary} onClick={save}>{saved ? "✅ Sauvegardé !" : "💾 Sauvegarder"}</button>
     </div>
   );
