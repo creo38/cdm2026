@@ -181,13 +181,24 @@ function calcScore(player, results) {
     // Classement réel calculé automatiquement depuis les vrais scores
     const realStandings = calcGroupStandingsRaw(group, results?.groupResults || {});
     if (!realStandings.some(s => s.played > 0)) return; // groupe pas encore joué
-    // Classement pronostiqué déduit des scores saisis par le joueur
+
+    // Reconstruit le classement pronostiqué depuis les scores saisis par le joueur
     const fakePreds = {};
+    let groupPredCount = 0;
     (player.predictions || []).forEach(pred => {
       if (pred.home !== "" && pred.away !== "" && !isNaN(parseInt(pred.home)) && !isNaN(parseInt(pred.away))) {
-        fakePreds[pred.matchId] = { homeScore: pred.home, awayScore: pred.away };
+        // Vérifier que ce match appartient bien à ce groupe
+        const match = GROUP_MATCHES.find(m => m.id === pred.matchId && m.group === group);
+        if (match) {
+          fakePreds[pred.matchId] = { homeScore: pred.home, awayScore: pred.away };
+          groupPredCount++;
+        }
       }
     });
+
+    // Ne calculer les +2 que si le joueur a pronostiqué AU MOINS les 6 matchs du groupe
+    if (groupPredCount < 6) return;
+
     const predStandings = calcGroupStandingsRaw(group, fakePreds);
     predStandings.forEach((s, idx) => {
       if (realStandings[idx]?.team === s.team) {
@@ -1567,6 +1578,8 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
         <button style={{ ...styles.tab, ...(tab === "phases" ? styles.tabActive : {}) }} onClick={() => setTab("phases")}>📅 Phases ouvertes</button>
         <button style={{ ...styles.tab, ...(tab === "bonus" ? styles.tabActive : {}) }} onClick={() => setTab("bonus")}>🌟 Bonus</button>
         <button style={{ ...styles.tab, ...(tab === "players" ? styles.tabActive : {}) }} onClick={() => setTab("players")}>👥 Joueurs</button>
+        <button style={{ ...styles.tab, ...(tab === "detail" ? styles.tabActive : {}) }} onClick={() => setTab("detail")}>🔍 Détail points</button>
+        <button style={{ ...styles.tab, ...(tab === "bracket" ? styles.tabActive : {}) }} onClick={() => setTab("bracket")}>🏆 Tableau KO</button>
         <button style={{ ...styles.tab, ...(tab === "test" ? styles.tabActive : {}), borderColor: "#7c3aed" }} onClick={() => setTab("test")}>🧪 Test</button>
       </div>
       {tab === "scores" && <AdminScores results={results} updateResults={updateResults} />}
@@ -1575,6 +1588,8 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
       {tab === "phases" && <AdminPhases results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
       {tab === "bonus" && <AdminBonus results={results} updateResults={updateResults} />}
       {tab === "players" && <AdminPlayers players={players} updatePlayers={updatePlayers} />}
+      {tab === "detail" && <AdminDetail players={players} results={results} />}
+      {tab === "bracket" && <AdminBracket results={results} updateResults={updateResults} />}
       {tab === "test" && <AdminTest results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
     </div>
   );
@@ -1975,6 +1990,183 @@ function AdminTest({ results, updateResults, players, updatePlayers }) {
           Résultats réels injectés : <strong style={{color:C.text}}>🏆 France</strong> · <strong style={{color:C.text}}>⚽ Kylian Mbappé</strong>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── ADMIN DETAIL POINTS ─────────────────────────────────────────────────────
+
+function AdminDetail({ players, results }) {
+  const [selectedId, setSelectedId] = useState(players[0]?.id || "");
+  const player = players.find(p => p.id === selectedId);
+  if (!player) return <p style={styles.hint}>Aucun joueur.</p>;
+
+  const { total, detail } = calcScore(player, results);
+
+  // Grouper les points par catégorie
+  const matchPts = Object.entries(detail).filter(([k]) => !k.startsWith("rank_") && !k.startsWith("ko_") && !k.startsWith("bonus_"));
+  const rankPts = Object.entries(detail).filter(([k]) => k.startsWith("rank_"));
+  const koPts = Object.entries(detail).filter(([k]) => k.startsWith("ko_"));
+  const bonusPts = Object.entries(detail).filter(([k]) => k.startsWith("bonus_"));
+
+  const matchTotal = matchPts.reduce((s, [,v]) => s + v, 0);
+  const rankTotal = rankPts.reduce((s, [,v]) => s + v, 0);
+  const koTotal = koPts.reduce((s, [,v]) => s + v, 0);
+  const bonusTotal = bonusPts.reduce((s, [,v]) => s + v, 0);
+
+  return (
+    <div>
+      {/* Sélecteur joueur */}
+      <select style={{ ...styles.select, marginBottom: 16 }} value={selectedId} onChange={e => setSelectedId(e.target.value)}>
+        {players.map(p => {
+          const { total } = calcScore(p, results);
+          return <option key={p.id} value={p.id}>{p.name} — {total} pts</option>;
+        })}
+      </select>
+
+      {/* Résumé */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        {[
+          { label: "⚽ Matchs", val: matchTotal, color: C.accent },
+          { label: "📊 Classements", val: rankTotal, color: "#3b82f6" },
+          { label: "🏆 Phase finale", val: koTotal, color: "#f59e0b" },
+          { label: "🌟 Bonus", val: bonusTotal, color: "#22c55e" },
+          { label: "TOTAL", val: total, color: C.text },
+        ].map(({ label, val, color }) => (
+          <div key={label} style={{ background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>
+            <div style={{ fontSize: 11, color: C.textMuted }}>{label}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Détail matchs */}
+      <div style={styles.groupSection}>
+        <h3 style={styles.groupTitle}>⚽ Détail matchs de poules</h3>
+        {GROUP_MATCHES.map(m => {
+          const pred = player.predictions?.find(p => p.matchId === m.id);
+          const real = results.groupResults?.[m.id];
+          const pts = detail[m.id];
+          if (!pred || pred.home === "" || !real || real.homeScore === "") return null;
+          return (
+            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", borderBottom: `1px solid ${C.border}`, fontSize: 12, flexWrap: "wrap" }}>
+              <span style={{ color: C.textMuted, minWidth: 20 }}>{m.group}</span>
+              <span style={{ flex: 1 }}>{flag(m.home)} {m.home} vs {flag(m.away)} {m.away}</span>
+              <span style={{ color: C.textMuted }}>Pronos: <strong style={{ color: C.text }}>{pred.home}-{pred.away}</strong></span>
+              <span style={{ color: C.textMuted }}>Réel: <strong style={{ color: C.text }}>{real.homeScore}-{real.awayScore}</strong></span>
+              <span style={{ ...styles.ptsBadge, background: pts === 3 ? "#22c55e" : pts === 1 ? "#f59e0b" : "#ef4444" }}>
+                {pts === 3 ? "🎯 +3" : pts === 1 ? "✅ +1" : "❌ 0"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Détail classements */}
+      {rankTotal > 0 && (
+        <div style={styles.groupSection}>
+          <h3 style={styles.groupTitle}>📊 Points classements de groupe</h3>
+          {Object.keys(GROUPS).map(group => {
+            const groupPts = [0,1,2,3].reduce((acc, i) => acc + (detail[`rank_${group}_${i}`] || 0), 0);
+            if (groupPts === 0) return null;
+            return (
+              <div key={group} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", borderBottom: `1px solid ${C.border}`, fontSize: 13 }}>
+                <span>Groupe {group}</span>
+                <span style={{ color: "#3b82f6", fontWeight: 700 }}>+{groupPts} pts</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Bonus */}
+      {bonusTotal > 0 && (
+        <div style={styles.groupSection}>
+          <h3 style={styles.groupTitle}>🌟 Bonus</h3>
+          {detail["bonus_winner"] && <div style={{ fontSize: 13, padding: "4px 0" }}>🏆 Vainqueur CDM correct → <strong style={{ color: "#22c55e" }}>+5 pts</strong></div>}
+          {detail["bonus_topScorer"] && <div style={{ fontSize: 13, padding: "4px 0" }}>⚽ Meilleur buteur correct → <strong style={{ color: "#22c55e" }}>+5 pts</strong></div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ADMIN BRACKET KO ────────────────────────────────────────────────────────
+
+function AdminBracket({ results, updateResults }) {
+  const qualified = calcQualified(results.groupResults);
+  const certain = calcCertainQualified(results.groupResults);
+
+  // Vainqueurs réels saisis
+  const realWinners = {};
+  ["R16","QF","SF","F"].forEach(phase => {
+    Object.entries(results.koResults?.[phase] || {}).forEach(([mid, v]) => {
+      if (v?.winner) realWinners[mid] = v.winner;
+    });
+  });
+
+  const [localKo, setLocalKo] = useState(results.koResults || {});
+  const [saved, setSaved] = useState(false);
+
+  function save() {
+    updateResults({ ...results, koResults: localKo });
+    setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  const allPhases = [
+    { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
+    { key: "QF",  label: "Huitièmes de finale", bracket: QF_BRACKET },
+    { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
+    { key: "F",   label: "Finale",               bracket: F_BRACKET },
+  ];
+
+  return (
+    <div>
+      <p style={styles.hint}>Tableau calculé automatiquement depuis les résultats de poules. Tu peux corriger manuellement si besoin.</p>
+
+      {allPhases.map(({ key, label, bracket }) => (
+        <div key={key} style={styles.groupSection}>
+          <h3 style={styles.groupTitle}>{label}</h3>
+          {bracket.map(match => {
+            const homeTeam = resolveSlot(match.home, certain, realWinners);
+            const awayTeam = resolveSlot(match.away, certain, realWinners);
+            const current = localKo[key]?.[match.id];
+            const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
+
+            return (
+              <div key={match.id} style={{ ...styles.matchRow, flexWrap: "wrap", gap: 6 }}>
+                <span style={{ fontSize: 13, minWidth: 120 }}>
+                  {homeTeam ? <>{flag(homeTeam)} {homeTeam}</> : <span style={{ color: C.textMuted, fontSize: 11 }}>{slotLabel(match.home)}</span>}
+                  <span style={{ color: C.textMuted, margin: "0 4px" }}>vs</span>
+                  {awayTeam ? <>{flag(awayTeam)} {awayTeam}</> : <span style={{ color: C.textMuted, fontSize: 11 }}>{slotLabel(match.away)}</span>}
+                </span>
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1 }}>
+                  <input style={{ ...styles.scoreInput, width: 44 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
+                    value={current?.homeScore ?? ""}
+                    onChange={e => setLocalKo(k => ({ ...k, [key]: { ...(k[key]||{}), [match.id]: { ...(k[key]?.[match.id]||{}), homeScore: e.target.value } } }))} />
+                  <span style={styles.vs}>–</span>
+                  <input style={{ ...styles.scoreInput, width: 44 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
+                    value={current?.awayScore ?? ""}
+                    onChange={e => setLocalKo(k => ({ ...k, [key]: { ...(k[key]||{}), [match.id]: { ...(k[key]?.[match.id]||{}), awayScore: e.target.value } } }))} />
+                  {teamsForMatch.length === 2
+                    ? <select style={{ ...styles.select, flex: 1 }}
+                        value={current?.winner || ""}
+                        onChange={e => setLocalKo(k => ({ ...k, [key]: { ...(k[key]||{}), [match.id]: { ...(k[key]?.[match.id]||{}), winner: e.target.value } } }))}>
+                        <option value="">-- Vainqueur --</option>
+                        {teamsForMatch.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
+                      </select>
+                    : <input style={{ ...styles.koInput, flex: 1 }} placeholder="Vainqueur"
+                        value={current?.winner || ""}
+                        onChange={e => setLocalKo(k => ({ ...k, [key]: { ...(k[key]||{}), [match.id]: { ...(k[key]?.[match.id]||{}), winner: e.target.value } } }))} />
+                  }
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+
+      <button style={styles.btnPrimary} onClick={save}>{saved ? "✅ Sauvegardé !" : "💾 Sauvegarder le tableau"}</button>
     </div>
   );
 }
