@@ -405,6 +405,7 @@ export default function App() {
         {screen === "player" && currentPlayer && <PlayerScreen player={currentPlayer} players={players} updatePlayers={updatePlayers} results={results} updateResults={updateResults} setCurrentPlayer={setCurrentPlayer} />}
         {screen === "admin" && <AdminScreen adminAuth={adminAuth} setAdminAuth={setAdminAuth} results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
         {screen === "leaderboard" && <LeaderboardScreen players={players} results={results} />}
+        {screen === "grilles" && <GrillesScreen players={players} results={results} currentPlayer={currentPlayer} />}
         {screen === "login" && <LoginScreen players={players} setCurrentPlayer={setCurrentPlayer} setScreen={setScreen} />}
       </main>
     </div>
@@ -428,6 +429,7 @@ function Header({ screen, setScreen, currentPlayer, setCurrentPlayer, adminAuth,
             ? <NavBtn label={`👤 ${currentPlayer.name.split(" ")[0]}`} onClick={() => setScreen("player")} active={screen === "player"} />
             : <NavBtn label="🎮 Jouer" onClick={() => setScreen("login")} active={screen === "login" || screen === "register"} />
           }
+          <NavBtn label="👁️ Grilles" onClick={() => setScreen("grilles")} active={screen === "grilles"} />
           <NavBtn label="⚙️ Admin" onClick={() => setScreen("admin")} active={screen === "admin"} />
         </nav>
       </div>
@@ -1521,6 +1523,125 @@ function BonusTab({ player, results, detail }) {
 
 
 
+// ─── GRILLES SCREEN ───────────────────────────────────────────────────────────
+
+function GrillesScreen({ players, results, currentPlayer }) {
+  const [selectedId, setSelectedId] = useState(null);
+
+  // Seuls les joueurs ayant verrouillé leur grille sont visibles
+  const lockedPlayers = players.filter(p => p.locked);
+  const selected = players.find(p => p.id === selectedId);
+
+  // Condition d'accès : être connecté et avoir verrouillé sa propre grille
+  const canView = currentPlayer && currentPlayer.locked;
+
+  if (!currentPlayer) return (
+    <div style={styles.formWrap}>
+      <h2 style={styles.formTitle}>👁️ Grilles des joueurs</h2>
+      <p style={styles.hint}>Connecte-toi pour voir les grilles des autres joueurs.</p>
+      <p style={{ ...styles.hint, color: "#f59e0b", marginTop: 8 }}>🔒 Accessible uniquement après avoir verrouillé ta propre grille.</p>
+    </div>
+  );
+
+  if (!canView) return (
+    <div style={styles.formWrap}>
+      <h2 style={styles.formTitle}>👁️ Grilles des joueurs</h2>
+      <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: 16 }}>
+        <p style={{ color: "#f97316", fontWeight: 700, margin: "0 0 8px" }}>🔒 Accès verrouillé</p>
+        <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
+          Tu dois <strong style={{ color: C.text }}>valider définitivement ta grille</strong> avant de pouvoir consulter les pronostics des autres joueurs.
+          Cela évite que les grilles des autres influencent tes propres choix !
+        </p>
+      </div>
+    </div>
+  );
+
+  if (selected) return (
+    <div style={styles.playerWrap}>
+      <button style={{ ...styles.linkBtn, marginBottom: 12, fontSize: 14 }} onClick={() => setSelectedId(null)}>← Retour à la liste</button>
+
+      <div style={styles.playerHeader}>
+        <div style={styles.avatarLg}>{getInitials(selected.name)}</div>
+        <div>
+          <h2 style={styles.playerName}>{selected.name}</h2>
+          <div style={styles.scoreDisplay}>🏆 Score : <strong>{calcScore(selected, results).total} pts</strong></div>
+          <div style={{ fontSize: 11, color: "#22c55e", marginTop: 2 }}>🔒 Grille verrouillée</div>
+        </div>
+      </div>
+
+      {/* Bonus */}
+      <div style={styles.groupSection}>
+        <h3 style={styles.groupTitle}>🌟 Pronos bonus</h3>
+        <div style={{ fontSize: 13, padding: "4px 0" }}>🏆 Vainqueur : <strong>{flag(selected.bonusPredictions?.winner || "")} {selected.bonusPredictions?.winner || "—"}</strong></div>
+        <div style={{ fontSize: 13, padding: "4px 0" }}>⚽ Meilleur buteur : <strong>{selected.bonusPredictions?.topScorer || "—"}</strong></div>
+      </div>
+
+      {/* Scores de poules — groupes avec résultats */}
+      {Object.entries(GROUPS).map(([group]) => {
+        const groupMatches = GROUP_MATCHES.filter(m => m.group === group);
+        const hasPreds = groupMatches.some(m => {
+          const p = selected.predictions?.find(p => p.matchId === m.id);
+          return p && p.home !== "";
+        });
+        if (!hasPreds) return null;
+        return (
+          <div key={group} style={styles.groupSection}>
+            <h3 style={styles.groupTitle}>Groupe {group}</h3>
+            {groupMatches.map(m => {
+              const pred = selected.predictions?.find(p => p.matchId === m.id);
+              if (!pred || pred.home === "") return null;
+              const real = results.groupResults?.[m.id];
+              const hasResult = real && real.homeScore !== "";
+              const { detail } = calcScore(selected, results);
+              const pts = detail[m.id];
+              return (
+                <div key={m.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"5px 0", borderBottom:`1px solid ${C.border}`, fontSize:12, flexWrap:"wrap" }}>
+                  <span style={{ flex:1 }}>{flag(m.home)} {m.home} <strong>{pred.home}–{pred.away}</strong> {flag(m.away)} {m.away}</span>
+                  {hasResult && <span style={{ color:C.textMuted }}>({real.homeScore}–{real.awayScore})</span>}
+                  {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts===3?"#22c55e":pts===1?"#f59e0b":"#ef4444" }}>{pts===3?"🎯+3":pts===1?"✅+1":"❌0"}</span>}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  return (
+    <div style={styles.lbWrap}>
+      <h2 style={styles.formTitle}>👁️ Grilles des joueurs</h2>
+      <p style={styles.hint}>{lockedPlayers.length} grille{lockedPlayers.length > 1 ? "s" : ""} verrouillée{lockedPlayers.length > 1 ? "s" : ""} — clique sur un joueur pour voir ses pronostics.</p>
+
+      {lockedPlayers.length === 0 && <p style={styles.empty}>Aucune grille verrouillée pour le moment.</p>}
+
+      {lockedPlayers
+        .map(p => ({ ...p, score: calcScore(p, results).total }))
+        .sort((a, b) => b.score - a.score)
+        .map((p, i) => (
+          <button key={p.id} style={{ ...styles.playerListItem, justifyContent:"space-between" }}
+            onClick={() => setSelectedId(p.id)}>
+            <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+              <span style={{ color:C.textMuted, minWidth:24 }}>{i+1}.</span>
+              <div style={styles.avatarSm}>{getInitials(p.name)}</div>
+              <div>
+                <div style={{ fontWeight:600 }}>{p.name}</div>
+                <div style={{ fontSize:11, color:C.textMuted }}>
+                  🏆 {p.bonusPredictions?.winner || "—"} · ⚽ {p.bonusPredictions?.topScorer || "—"}
+                </div>
+              </div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontWeight:800, color:C.accent }}>{p.score} pts</span>
+              <span style={{ color:C.textMuted }}>›</span>
+            </div>
+          </button>
+        ))
+      }
+    </div>
+  );
+}
+
 function LeaderboardScreen({ players, results, compact = false }) {
   const ranked = [...players]
     .map(p => ({ ...p, score: calcScore(p, results).total }))
@@ -2183,14 +2304,58 @@ function AdminDetail({ players, results }) {
         </div>
       )}
 
-      {/* Bonus */}
-      {bonusTotal > 0 && (
+      {/* Détail phase finale */}
+      {koTotal > 0 && (
         <div style={styles.groupSection}>
-          <h3 style={styles.groupTitle}>🌟 Bonus</h3>
-          {detail["bonus_winner"] && <div style={{ fontSize: 13, padding: "4px 0" }}>🏆 Vainqueur CDM correct → <strong style={{ color: "#22c55e" }}>+5 pts</strong></div>}
-          {detail["bonus_topScorer"] && <div style={{ fontSize: 13, padding: "4px 0" }}>⚽ Meilleur buteur correct → <strong style={{ color: "#22c55e" }}>+5 pts</strong></div>}
+          <h3 style={styles.groupTitle}>🏆 Détail phase finale</h3>
+          {["R16","QF","SF","F"].map(phase => {
+            const phaseLabel = { R16:"Seizièmes", QF:"Huitièmes", SF:"Demi-finales", F:"Finale" }[phase];
+            const phaseResults = results.koResults?.[phase] || {};
+            const phasePreds = player.koPredictions?.[phase] || [];
+            const phasePts = Object.entries(detail).filter(([k,v]) => k.startsWith(`ko_${phase}_`) && v > 0);
+            if (phasePts.length === 0 && phasePreds.length === 0) return null;
+            return (
+              <div key={phase} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: C.textMuted, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>{phaseLabel}</div>
+                {phasePreds.map(pred => {
+                  if (!pred.winner) return null;
+                  const real = phaseResults[pred.matchId];
+                  const pts = detail[`ko_${phase}_${pred.matchId}`];
+                  const hasResult = real?.winner;
+                  return (
+                    <div key={pred.matchId} style={{ display:"flex", alignItems:"center", gap:8, padding:"4px 0", borderBottom:`1px solid ${C.border}`, fontSize:12, flexWrap:"wrap" }}>
+                      <span style={{ flex:1 }}>
+                        Pronos vainqueur : <strong style={{ color:C.text }}>{flag(pred.winner)} {pred.winner}</strong>
+                        {pred.homeScore !== undefined && pred.homeScore !== "" && <span style={{ color:C.textMuted }}> ({pred.homeScore}–{pred.awayScore})</span>}
+                      </span>
+                      {hasResult && <span style={{ color:C.textMuted }}>Réel : <strong style={{ color:C.text }}>{flag(real.winner)} {real.winner}</strong></span>}
+                      {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts >= 3 ? "#22c55e" : pts === 2 ? "#f59e0b" : "#ef4444" }}>
+                        {pts >= 3 ? "🎯 +3" : pts === 2 ? "✅ +2" : "❌ 0"}
+                      </span>}
+                      {!hasResult && <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       )}
+
+      {/* Bonus */}
+      <div style={styles.groupSection}>
+        <h3 style={styles.groupTitle}>🌟 Bonus fin de tournoi</h3>
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", borderBottom:`1px solid ${C.border}`, fontSize:13 }}>
+          <span style={{ flex:1 }}>🏆 Vainqueur CDM : <strong style={{ color:C.text }}>{player.bonusPredictions?.winner || "Non renseigné"}</strong></span>
+          {results.bonusResults?.winner && <span style={{ color:C.textMuted }}>Réel : <strong>{flag(results.bonusResults.winner)} {results.bonusResults.winner}</strong></span>}
+          {detail["bonus_winner"] ? <span style={{ ...styles.ptsBadge, background:"#22c55e" }}>+5</span> : results.bonusResults?.winner ? <span style={{ ...styles.ptsBadge, background:"#ef4444" }}>0</span> : <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 0", fontSize:13 }}>
+          <span style={{ flex:1 }}>⚽ Meilleur buteur : <strong style={{ color:C.text }}>{player.bonusPredictions?.topScorer || "Non renseigné"}</strong></span>
+          {results.bonusResults?.topScorer && <span style={{ color:C.textMuted }}>Réel : <strong>{results.bonusResults.topScorer}</strong></span>}
+          {detail["bonus_topScorer"] ? <span style={{ ...styles.ptsBadge, background:"#22c55e" }}>+5</span> : results.bonusResults?.topScorer ? <span style={{ ...styles.ptsBadge, background:"#ef4444" }}>0</span> : <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
+        </div>
+      </div>
     </div>
   );
 }
