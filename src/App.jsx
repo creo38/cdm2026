@@ -684,9 +684,12 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const [saved, setSaved] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
 
-  const isLocked = !!player.locked;
-  const globalLocked = !!results.locked;
-  const locked = isLocked || globalLocked;
+  const isLocked = !!player.locked;       // verrou grille de poules
+  const globalLocked = !!results.locked;  // verrou admin global
+  const locked = isLocked || globalLocked; // bloque les poules
+  // Pour les phases KO : seul le verrou admin global bloque tout
+  // Le verrou de poules (player.locked) ne doit PAS bloquer les phases KO
+  const lockedKO = globalLocked;
 
   const { total, detail } = calcScore(player, results);
 
@@ -720,7 +723,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const openPhase = results.openKoPhase || "none";
   const phasePreds = koPreds[openPhase] || [];
   const phaseHasPreds = openPhase !== "none" && phasePreds.length > 0 && phasePreds.some(p => p.winner);
-  const showPhaseBanner = openPhase !== "none" && !phaseHasPreds && !locked;
+  const showPhaseBanner = openPhase !== "none" && !phaseHasPreds && !lockedKO;
 
   return (
     <div style={styles.playerWrap}>
@@ -728,7 +731,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
         <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: "10px 14px", marginBottom: 8 }}>
           <strong style={{ color: "#f97316" }}>🆕 Nouvelle phase ouverte !</strong>
           <p style={{ color: C.textMuted, fontSize: 12, margin: "4px 0 6px" }}>
-            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "QF": "Huitièmes", "SF": "Demi-finales", "F": "Finale" }[openPhase]}</strong>.
+            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "QF": "Quarts", "SF": "Demi-finales", "F": "Finale" }[openPhase]}</strong>.
             Va dans l'onglet "🎯 Pronostics" et n'oublie pas de valider !
           </p>
           <button style={{ ...styles.btnPrimary, width: "auto", fontSize: 12, padding: "6px 12px", background: "#f97316" }}
@@ -763,12 +766,12 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
           <div style={styles.sectionLabel}>⚽ Matchs de poules</div>
           <GroupMatchesTab preds={preds} setPreds={setPreds} results={results} detail={detail} locked={locked} />
           <div style={{ ...styles.sectionLabel, marginTop: 16 }}>🏆 Phase finale</div>
-          <KOTab koPreds={koPreds} setKoPreds={setKoPreds} results={results} detail={detail} locked={locked} lockedKoPhases={player.lockedKoPhases || []} />
+          <KOTab koPreds={koPreds} setKoPreds={setKoPreds} results={results} detail={detail} locked={lockedKO} lockedKoPhases={player.lockedKoPhases || []} />
           {/* Bouton valider la phase KO ouverte */}
-          {openPhase !== "none" && !locked && !(player.lockedKoPhases || []).includes(openPhase) && (
+          {openPhase !== "none" && !lockedKO && !(player.lockedKoPhases || []).includes(openPhase) && (
             <div style={{ marginTop: 12, padding: "12px 14px", background: "#1a1208", border: "1px solid #f97316", borderRadius: 10 }}>
               <p style={{ ...styles.hint, color: "#f97316", marginBottom: 8 }}>
-                <strong>Phase ouverte : {{ R16: "Seizièmes", QF: "Huitièmes", SF: "Demi-finales", F: "Finale" }[openPhase]}</strong> — pensez à valider vos pronostics avant la fermeture !
+                <strong>Phase ouverte : {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}</strong> — pensez à valider vos pronostics avant la fermeture !
               </p>
               <button style={{ ...styles.btnPrimary, background: "#f97316" }}
                 onClick={() => {
@@ -781,12 +784,12 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
                     setCurrentPlayer(updated.find(p => p.id === player.id));
                   }
                 }}>
-                🔒 Valider mes pronostics — {{ R16: "Seizièmes", QF: "Huitièmes", SF: "Demi-finales", F: "Finale" }[openPhase]}
+                🔒 Valider mes pronostics — {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}
               </button>
             </div>
           )}
           {openPhase !== "none" && (player.lockedKoPhases || []).includes(openPhase) && (
-            <p style={{ ...styles.hint, color: "#22c55e", marginTop: 8 }}>✅ Pronostics des {{ R16: "Seizièmes", QF: "Huitièmes", SF: "Demi-finales", F: "Finale" }[openPhase]} verrouillés.</p>
+            <p style={{ ...styles.hint, color: "#22c55e", marginTop: 8 }}>✅ Pronostics des {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]} verrouillés.</p>
           )}
         </div>
       )}
@@ -1185,7 +1188,7 @@ const R16_BRACKET = [
 ];
 
 const QF_BRACKET = [
-  // Huitièmes selon bracket FIFA officiel
+  // Quarts selon bracket FIFA officiel
   { id: "QF_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } }, // V73 vs V74
   { id: "QF_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } }, // V75 vs V76
   { id: "QF_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } }, // V77 vs V78
@@ -1346,7 +1349,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
 
   const allPhases = [
     { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
-    { key: "QF",  label: "Huitièmes de finale", bracket: QF_BRACKET },
+    { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
@@ -1581,7 +1584,7 @@ function GrillesScreen({ players, results, currentPlayer }) {
       {["R16","QF","SF","F"].map(phase => {
         const phasePreds = selected.koPredictions?.[phase] || [];
         const phaseResults = results.koResults?.[phase] || {};
-        const phaseLabel = { R16:"Seizièmes", QF:"Huitièmes", SF:"Demi-finales", F:"Finale" }[phase];
+        const phaseLabel = { R16:"Seizièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
         const isLocked = (selected.lockedKoPhases || []).includes(phase);
         if (!isLocked || phasePreds.length === 0) return null;
         const { detail } = calcScore(selected, results);
@@ -1921,7 +1924,7 @@ function AdminKO({ results, updateResults }) {
 
   const allPhases = [
     { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
-    { key: "QF",  label: "Huitièmes de finale", bracket: QF_BRACKET },
+    { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
@@ -2003,7 +2006,7 @@ function AdminPhases({ results, updateResults, players, updatePlayers }) {
   const phases = [
     { key: "none", label: "⏳ Phase de poules", desc: "Pronostics phase finale fermés — les joueurs saisissent leurs scores de poules." },
     { key: "R16",  label: "Seizièmes de finale", desc: "Les joueurs pronostiquent les 16 matchs des seizièmes. Les poules précédentes sont verrouillées." },
-    { key: "QF",   label: "Huitièmes de finale", desc: "Les joueurs pronostiquent les 8 quarts. Les seizièmes sont verrouillés." },
+    { key: "QF",   label: "Quarts de finale",     desc: "Les joueurs pronostiquent les 8 quarts de finale. Les seizièmes sont verrouillés." },
     { key: "SF",   label: "Demi-finales",         desc: "Les joueurs pronostiquent les 4 demi-finales. Les quarts sont verrouillés." },
     { key: "F",    label: "Finale",               desc: "Les joueurs pronostiquent la finale. Les demi-finales sont verrouillées." },
   ];
@@ -2089,7 +2092,7 @@ function AdminPhases({ results, updateResults, players, updatePlayers }) {
         <strong style={{ color: C.text }}>Workflow recommandé :</strong><br/>
         1. Avant le tournoi → laisser sur "Phase de poules"<br/>
         2. Après les poules → saisir scores + ouvrir "Seizièmes"<br/>
-        3. Après les seizièmes → saisir résultats phase finale + ouvrir "Huitièmes"<br/>
+        3. Après les seizièmes → saisir résultats phase finale + ouvrir "Quarts"<br/>
         4. Et ainsi de suite jusqu'à la Finale
       </div>
     </div>
@@ -2340,7 +2343,7 @@ function AdminDetail({ players, results }) {
         <div style={styles.groupSection}>
           <h3 style={styles.groupTitle}>🏆 Détail phase finale</h3>
           {["R16","QF","SF","F"].map(phase => {
-            const phaseLabel = { R16:"Seizièmes", QF:"Huitièmes", SF:"Demi-finales", F:"Finale" }[phase];
+            const phaseLabel = { R16:"Seizièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
             const phaseResults = results.koResults?.[phase] || {};
             const phasePreds = player.koPredictions?.[phase] || [];
             const phasePts = Object.entries(detail).filter(([k,v]) => k.startsWith(`ko_${phase}_`) && v > 0);
@@ -2415,7 +2418,7 @@ function AdminBracket({ results, updateResults }) {
 
   const allPhases = [
     { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
-    { key: "QF",  label: "Huitièmes de finale", bracket: QF_BRACKET },
+    { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
@@ -2483,7 +2486,7 @@ function AdminPlayers({ players, updatePlayers }) {
   }
 
   function unlockKoPhase(id, phase) {
-    const label = { R16: "Seizièmes", QF: "Huitièmes", SF: "Demi-finales", F: "Finale" }[phase];
+    const label = { R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[phase];
 
     updatePlayers(players.map(p => p.id === id
       ? { ...p, lockedKoPhases: (p.lockedKoPhases || []).filter(ph => ph !== phase) }
