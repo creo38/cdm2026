@@ -1163,33 +1163,35 @@ function GroupStandingsCard({ group, groupResults, detail, qualified8 }) {
 // ─── TABLEAU FIFA OFFICIEL ────────────────────────────────────────────────────
 
 const R16_BRACKET = [
-  { id: "R16_1",  home: { type: "2e",  group: "A" }, away: { type: "2e",  group: "B" } },
-  { id: "R16_2",  home: { type: "1er", group: "C" }, away: { type: "2e",  group: "F" } },
-  { id: "R16_3",  home: { type: "1er", group: "E" }, away: { type: "3e",  slots: ["A","B","C","D","F"] } },
-  { id: "R16_4",  home: { type: "1er", group: "I" }, away: { type: "3e",  slots: ["C","D","F","G","H"] } },
-  { id: "R16_5",  home: { type: "1er", group: "F" }, away: { type: "2e",  group: "C" } },
-  { id: "R16_6",  home: { type: "2e",  group: "E" }, away: { type: "2e",  group: "I" } },
-  { id: "R16_7",  home: { type: "1er", group: "A" }, away: { type: "3e",  slots: ["C","E","F","H","I"] } },
-  { id: "R16_8",  home: { type: "1er", group: "L" }, away: { type: "3e",  slots: ["E","H","I","J","K"] } },
-  { id: "R16_9",  home: { type: "1er", group: "G" }, away: { type: "3e",  slots: ["A","E","H","I","J"] } },
-  { id: "R16_10", home: { type: "1er", group: "D" }, away: { type: "3e",  slots: ["B","E","F","I","J"] } },
-  { id: "R16_11", home: { type: "1er", group: "H" }, away: { type: "2e",  group: "J" } },
-  { id: "R16_12", home: { type: "2e",  group: "K" }, away: { type: "2e",  group: "L" } },
-  { id: "R16_13", home: { type: "1er", group: "B" }, away: { type: "3e",  slots: ["E","F","G","I","J"] } },
-  { id: "R16_14", home: { type: "2e",  group: "D" }, away: { type: "2e",  group: "G" } },
-  { id: "R16_15", home: { type: "1er", group: "J" }, away: { type: "2e",  group: "H" } },
-  { id: "R16_16", home: { type: "1er", group: "K" }, away: { type: "3e",  slots: ["D","E","I","J","L"] } },
+  // Matchs 73-88 selon tableau officiel FIFA CDM 2026
+  { id: "R16_1",  home: { type: "2e",  group: "A" }, away: { type: "2e",  group: "B" } },   // M73
+  { id: "R16_2",  home: { type: "1er", group: "E" }, away: { type: "3e",  slots: ["A","B","C","D","F"] } }, // M74
+  { id: "R16_3",  home: { type: "1er", group: "F" }, away: { type: "2e",  group: "C" } },   // M75
+  { id: "R16_4",  home: { type: "1er", group: "C" }, away: { type: "2e",  group: "F" } },   // M76
+  { id: "R16_5",  home: { type: "1er", group: "I" }, away: { type: "3e",  slots: ["C","D","F","G","H"] } }, // M77
+  { id: "R16_6",  home: { type: "2e",  group: "E" }, away: { type: "2e",  group: "I" } },   // M78
+  { id: "R16_7",  home: { type: "1er", group: "A" }, away: { type: "3e",  slots: ["C","E","F","H","I"] } }, // M79
+  { id: "R16_8",  home: { type: "1er", group: "L" }, away: { type: "3e",  slots: ["E","H","I","J","K"] } }, // M80
+  { id: "R16_9",  home: { type: "1er", group: "D" }, away: { type: "3e",  slots: ["B","E","F","I","J"] } }, // M81
+  { id: "R16_10", home: { type: "1er", group: "G" }, away: { type: "3e",  slots: ["A","E","H","I","J"] } }, // M82
+  { id: "R16_11", home: { type: "2e",  group: "K" }, away: { type: "2e",  group: "L" } },   // M83
+  { id: "R16_12", home: { type: "1er", group: "H" }, away: { type: "2e",  group: "J" } },   // M84
+  { id: "R16_13", home: { type: "1er", group: "B" }, away: { type: "3e",  slots: ["E","F","G","I","J"] } }, // M85
+  { id: "R16_14", home: { type: "1er", group: "J" }, away: { type: "2e",  group: "H" } },   // M86
+  { id: "R16_15", home: { type: "1er", group: "K" }, away: { type: "3e",  slots: ["D","E","I","J","L"] } }, // M87
+  { id: "R16_16", home: { type: "2e",  group: "D" }, away: { type: "2e",  group: "G" } },   // M88
 ];
 
 const QF_BRACKET = [
-  { id: "QF_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } },
-  { id: "QF_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } },
-  { id: "QF_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } },
-  { id: "QF_4", home: { winner: "R16_7"  }, away: { winner: "R16_8"  } },
-  { id: "QF_5", home: { winner: "R16_9"  }, away: { winner: "R16_10" } },
-  { id: "QF_6", home: { winner: "R16_11" }, away: { winner: "R16_12" } },
-  { id: "QF_7", home: { winner: "R16_13" }, away: { winner: "R16_14" } },
-  { id: "QF_8", home: { winner: "R16_15" }, away: { winner: "R16_16" } },
+  // Huitièmes selon bracket FIFA officiel
+  { id: "QF_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } }, // V73 vs V74
+  { id: "QF_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } }, // V75 vs V76
+  { id: "QF_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } }, // V77 vs V78
+  { id: "QF_4", home: { winner: "R16_7"  }, away: { winner: "R16_8"  } }, // V79 vs V80
+  { id: "QF_5", home: { winner: "R16_9"  }, away: { winner: "R16_10" } }, // V81 vs V82
+  { id: "QF_6", home: { winner: "R16_11" }, away: { winner: "R16_12" } }, // V83 vs V84
+  { id: "QF_7", home: { winner: "R16_13" }, away: { winner: "R16_14" } }, // V85 vs V86
+  { id: "QF_8", home: { winner: "R16_15" }, away: { winner: "R16_16" } }, // V87 vs V88
 ];
 
 const SF_BRACKET = [
@@ -1257,7 +1259,27 @@ function calcCertainQualified(groupResults) {
   return certain;
 }
 
-function resolveSlot(slot, qualified, koWinners) {
+// Affecte les meilleurs 3es aux slots en évitant les doublons
+// Appelé une fois pour tout le bracket, retourne un map slotId -> team
+function assignThirdPlaces(qualified, bracket) {
+  const thirds = qualified.filter(q => q.rank === "3e");
+  const slots3e = bracket.filter(m => m.away?.type === "3e" || m.home?.type === "3e")
+    .map(m => m.away?.type === "3e" ? { matchId: m.id, side: "away", slots: m.away.slots }
+                                     : { matchId: m.id, side: "home", slots: m.home.slots });
+  const assigned = {};
+  const usedGroups = new Set();
+  // Pour chaque slot 3e, trouver le meilleur 3e disponible dont le groupe est autorisé
+  slots3e.forEach(slot => {
+    const candidate = thirds.find(t => slot.slots.includes(t.group) && !usedGroups.has(t.group));
+    if (candidate) {
+      assigned[slot.matchId + "_" + slot.side] = candidate.team;
+      usedGroups.add(candidate.group);
+    }
+  });
+  return assigned;
+}
+
+function resolveSlot(slot, qualified, koWinners, thirdAssignments = {}, matchId = "", side = "") {
   if (slot.winner) return koWinners[slot.winner] || null;
   if (slot.type === "1er") {
     const q = qualified.find(q => q.rank === "1er" && q.group === slot.group);
@@ -1268,6 +1290,10 @@ function resolveSlot(slot, qualified, koWinners) {
     return q ? q.team : null;
   }
   if (slot.type === "3e") {
+    // Utiliser l'assignation pré-calculée si disponible
+    const key = matchId + "_" + side;
+    if (thirdAssignments[key]) return thirdAssignments[key];
+    // Fallback : premier 3e disponible dans les slots autorisés
     const thirds = qualified.filter(q => q.rank === "3e" && slot.slots.includes(q.group));
     return thirds.length > 0 ? thirds[0].team : null;
   }
@@ -1297,6 +1323,7 @@ function calcQualified(groupResults) {
 function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = [] }) {
   const qualified = calcQualified(results.groupResults); // pour scoring
   const certainQualified = calcCertainQualified(results.groupResults); // pour affichage anticipé
+  const thirdAssignments = assignThirdPlaces(certainQualified, R16_BRACKET);
   const groupsComplete = Object.keys(GROUPS).filter(g =>
     calcGroupStandings(g, results.groupResults).every(t => t.played === 3)
   ).length;
@@ -1368,10 +1395,10 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
               const pts = detail?.[`ko_${key}_${match.id}`];
 
               // Équipes réelles (résultats admin) et pronostiquées (choix joueur)
-              const homeReal = resolveSlot(match.home, certainQualified, realWinners);
-              const awayReal = resolveSlot(match.away, certainQualified, realWinners);
-              const homePred = resolveSlot(match.home, certainQualified, predWinners);
-              const awayPred = resolveSlot(match.away, certainQualified, predWinners);
+              const homeReal = resolveSlot(match.home, certainQualified, realWinners, thirdAssignments, match.id, "home");
+              const awayReal = resolveSlot(match.away, certainQualified, realWinners, thirdAssignments, match.id, "away");
+              const homePred = resolveSlot(match.home, certainQualified, predWinners, thirdAssignments, match.id, "home");
+              const awayPred = resolveSlot(match.away, certainQualified, predWinners, thirdAssignments, match.id, "away");
 
               // Pour l'affichage : priorité au réel, sinon pronostiqué
               const homeDisplay = homeReal || homePred;
@@ -1715,6 +1742,7 @@ function AdminKO({ results, updateResults }) {
   // Calcule les qualifiés depuis les vrais scores + overrides de classement
   const qualified = calcQualified(results.groupResults);
   const certain = calcCertainQualified(results.groupResults);
+  const thirdAssignments = assignThirdPlaces(certain, R16_BRACKET);
 
   // Vainqueurs déjà saisis pour la propagation
   const savedWinners = {};
@@ -1763,8 +1791,8 @@ function AdminKO({ results, updateResults }) {
           {bracket.map((match, idx) => {
             const m = local[key]?.[match.id] || {};
             // Résolution des équipes depuis les qualifiés calculés
-            const homeTeam = resolveSlot(match.home, certain, savedWinners);
-            const awayTeam = resolveSlot(match.away, certain, savedWinners);
+            const homeTeam = resolveSlot(match.home, certain, savedWinners, thirdAssignments, match.id, "home");
+            const awayTeam = resolveSlot(match.away, certain, savedWinners, thirdAssignments, match.id, "away");
             const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
             return (
               <div key={match.id} style={styles.koMatchRow}>
@@ -2204,8 +2232,8 @@ function AdminBracket({ results, updateResults }) {
         <div key={key} style={styles.groupSection}>
           <h3 style={styles.groupTitle}>{label}</h3>
           {bracket.map(match => {
-            const homeTeam = resolveSlot(match.home, certain, realWinners);
-            const awayTeam = resolveSlot(match.away, certain, realWinners);
+            const homeTeam = resolveSlot(match.home, certain, realWinners, thirdAssignments, match.id, "home");
+            const awayTeam = resolveSlot(match.away, certain, realWinners, thirdAssignments, match.id, "away");
             const current = localKo[key]?.[match.id];
             const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
 
