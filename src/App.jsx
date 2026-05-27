@@ -102,38 +102,39 @@ function calcGroupStandingsRaw(group, groupResults) {
     else            { stats[m.home].pts += 1; stats[m.away].pts += 1; }
   });
 
-  // Confrontations directes entre deux équipes (règle FIFA)
-  function h2h(teamA, teamB) {
-    let ptsA = 0, ptsB = 0, gdA = 0, gfA = 0;
-    GROUP_MATCHES.filter(m => m.group === group &&
-      ((m.home === teamA && m.away === teamB) || (m.home === teamB && m.away === teamA))
+  // Calcul des stats de confrontation directe entre un ensemble d'équipes
+  function h2hStats(teamsSubset) {
+    const h2h = {};
+    teamsSubset.forEach(t => { h2h[t] = { pts: 0, gd: 0, gf: 0 }; });
+    GROUP_MATCHES.filter(m =>
+      m.group === group &&
+      teamsSubset.includes(m.home) &&
+      teamsSubset.includes(m.away)
     ).forEach(m => {
       const r = groupResults?.[m.id];
       if (!r || r.homeScore === "" || r.awayScore === "") return;
       const h = parseInt(r.homeScore), a = parseInt(r.awayScore);
       if (isNaN(h) || isNaN(a)) return;
-      const [hA, hB] = m.home === teamA ? [h, a] : [a, h];
-      if (hA > hB)      { ptsA += 3; }
-      else if (hA < hB) { ptsB += 3; }
-      else              { ptsA += 1; ptsB += 1; }
-      gdA += (hA - hB);
-      gfA += hA;
+      h2h[m.home].gd += (h - a); h2h[m.away].gd += (a - h);
+      h2h[m.home].gf += h; h2h[m.away].gf += a;
+      if (h > a)      { h2h[m.home].pts += 3; }
+      else if (h < a) { h2h[m.away].pts += 3; }
+      else            { h2h[m.home].pts += 1; h2h[m.away].pts += 1; }
     });
-    return { ptsA, ptsB, gdA, gfA };
+    return h2h;
   }
 
   const rows = teams.map(t => ({ team: t, ...stats[t] }));
 
+  // Tri FIFA : d'abord par points généraux, puis sous-groupes à égalité
   rows.sort((a, b) => {
     // 1. Points généraux
     if (b.pts !== a.pts) return b.pts - a.pts;
-    // 2. Confrontation directe : points
-    const duel = h2h(a.team, b.team);
-    if (duel.ptsA !== duel.ptsB) return duel.ptsB - duel.ptsA;
-    // 3. Confrontation directe : différence de buts
-    if (duel.gdA !== 0) return -duel.gdA;
-    // 4. Confrontation directe : buts marqués
-    if (duel.gfA !== 0) return -duel.gfA;
+    // 2-4. Confrontation directe entre les deux équipes
+    const h2h = h2hStats([a.team, b.team]);
+    if (h2h[b.team].pts !== h2h[a.team].pts) return h2h[b.team].pts - h2h[a.team].pts;
+    if (h2h[b.team].gd !== h2h[a.team].gd) return h2h[b.team].gd - h2h[a.team].gd;
+    if (h2h[b.team].gf !== h2h[a.team].gf) return h2h[b.team].gf - h2h[a.team].gf;
     // 5. Différence de buts générale
     if (b.gd !== a.gd) return b.gd - a.gd;
     // 6. Buts marqués généraux
