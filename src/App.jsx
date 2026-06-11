@@ -597,6 +597,7 @@ function RegisterScreen({ players, updatePlayers, setScreen, setCurrentPlayer })
   const [pin, setPin] = useState("");
   const [winner, setWinner] = useState("");
   const [topScorer, setTopScorer] = useState("");
+  const [autreScorer, setAutreScorer] = useState(false);
   const [error, setError] = useState("");
 
   const allTeams = Object.values(GROUPS).flat();
@@ -647,16 +648,20 @@ function RegisterScreen({ players, updatePlayers, setScreen, setCurrentPlayer })
 
         <label style={{ ...styles.label, marginTop: 10 }}>⚽ Meilleur buteur <span style={styles.bonusPts}>+5 pts</span></label>
         <select style={styles.select}
-          value={TOP_SCORERS_CDM.includes(topScorer) ? topScorer : (topScorer ? "__autre__" : "")}
-          onChange={e => { if(e.target.value === "__autre__") setTopScorer(""); else setTopScorer(e.target.value); setError(""); }}>
+          value={TOP_SCORERS_CDM.includes(topScorer) ? topScorer : (topScorer || autreScorer ? "__autre__" : "")}
+          onChange={e => {
+            if (e.target.value === "__autre__") { setAutreScorer(true); setTopScorer(""); }
+            else { setAutreScorer(false); setTopScorer(e.target.value); }
+            setError("");
+          }}>
           <option value="">-- Choisir un joueur --</option>
           {TOP_SCORERS_CDM.map(s => <option key={s} value={s}>{s}</option>)}
           <option value="__autre__">Autre (saisie libre)</option>
         </select>
-        {/* Saisie libre si joueur hors liste et champ non vide, ou si "Autre" explicitement sélectionné */}
-        {topScorer !== "" && !TOP_SCORERS_CDM.includes(topScorer) && (
-          <input style={{ ...styles.input, marginTop: 4 }} placeholder="Saisir le nom du joueur"
-            value={topScorer}
+        {/* Champ libre si "Autre" sélectionné */}
+        {(autreScorer || (topScorer && !TOP_SCORERS_CDM.includes(topScorer))) && (
+          <input style={{ ...styles.input, marginTop: 6 }} placeholder="Saisir le nom du joueur"
+            value={topScorer} autoFocus
             onChange={e => { setTopScorer(e.target.value); setError(""); }} />
         )}
       </div>
