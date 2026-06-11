@@ -177,18 +177,17 @@ function calcScore(player, results) {
     }
   });
 
-  // Classement de groupe — comparaison classement pronostiqué vs classement réel calculé
+  // Classement de groupe — uniquement quand le groupe est terminé (6 matchs joués)
   Object.keys(GROUPS).forEach(group => {
-    // Classement réel calculé automatiquement depuis les vrais scores
     const realStandings = calcGroupStandingsRaw(group, results?.groupResults || {});
-    if (!realStandings.some(s => s.played > 0)) return; // groupe pas encore joué
+    // N'attribuer les +2 que si TOUS les matchs du groupe sont joués
+    const totalPlayed = realStandings.reduce((sum, s) => sum + s.played, 0) / 2;
+    if (totalPlayed < 6) return; // groupe pas terminé
 
-    // Reconstruit le classement pronostiqué depuis les scores saisis par le joueur
     const fakePreds = {};
     let groupPredCount = 0;
     (player.predictions || []).forEach(pred => {
       if (pred.home !== "" && pred.away !== "" && !isNaN(parseInt(pred.home)) && !isNaN(parseInt(pred.away))) {
-        // Vérifier que ce match appartient bien à ce groupe
         const match = GROUP_MATCHES.find(m => m.id === pred.matchId && m.group === group);
         if (match) {
           fakePreds[pred.matchId] = { homeScore: pred.home, awayScore: pred.away };
@@ -197,7 +196,6 @@ function calcScore(player, results) {
       }
     });
 
-    // Ne calculer les +2 que si le joueur a pronostiqué AU MOINS les 6 matchs du groupe
     if (groupPredCount < 6) return;
 
     const predStandings = calcGroupStandingsRaw(group, fakePreds);
@@ -717,14 +715,12 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
 
   function saveFinal() {
     if (locked) return;
-    if (!confirmLock) { setConfirmLock(true); return; }
     const predictions = Object.entries(preds).map(([matchId, v]) => ({ matchId, home: v.home, away: v.away }));
     const updated = players.map(p => p.id === player.id
       ? { ...p, predictions, koPredictions: koPreds, locked: true }
       : p);
     updatePlayers(updated);
     setCurrentPlayer(updated.find(p => p.id === player.id));
-    setConfirmLock(false);
     setSaved("final");
     setTimeout(() => setSaved(false), 3000);
   }
@@ -832,16 +828,6 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
         {locked ? (
           <div style={styles.lockedBanner}>
             🔒 Pronostics {isLocked ? "verrouillés définitivement" : "verrouillés par l'admin"} — consultation uniquement
-          </div>
-        ) : confirmLock ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <p style={{ ...styles.hint, textAlign: "center", color: "#f59e0b" }}>
-              ⚠️ Une fois verrouillé définitivement, aucune modification ne sera possible.
-            </p>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ ...styles.btnPrimary, background: "#22c55e" }} onClick={saveFinal}>✅ Oui, verrouiller</button>
-              <button style={{ ...styles.btnSecondary, flex: 1 }} onClick={() => setConfirmLock(false)}>Annuler</button>
-            </div>
           </div>
         ) : (
           <div style={{ display: "flex", gap: 8 }}>
