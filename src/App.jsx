@@ -737,7 +737,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
         <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: "10px 14px", marginBottom: 8 }}>
           <strong style={{ color: "#f97316" }}>🆕 Nouvelle phase ouverte !</strong>
           <p style={{ color: C.textMuted, fontSize: 12, margin: "4px 0 6px" }}>
-            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "QF": "Quarts", "SF": "Demi-finales", "F": "Finale" }[openPhase]}</strong>.
+            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "R8": "Huitièmes", "QF": "Quarts", "SF": "Demi-finales", "F": "Finale" }[openPhase]}</strong>.
             Va dans l'onglet "🎯 Pronostics" et n'oublie pas de valider !
           </p>
           <button style={{ ...styles.btnPrimary, width: "auto", fontSize: 12, padding: "6px 12px", background: "#f97316" }}
@@ -777,7 +777,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
           {openPhase !== "none" && !lockedKO && !(player.lockedKoPhases || []).includes(openPhase) && (
             <div style={{ marginTop: 12, padding: "12px 14px", background: "#1a1208", border: "1px solid #f97316", borderRadius: 10 }}>
               <p style={{ ...styles.hint, color: "#f97316", marginBottom: 8 }}>
-                <strong>Phase ouverte : {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}</strong> — pensez à valider vos pronostics avant la fermeture !
+                <strong>Phase ouverte : {{ R16: "Seizièmes", R8: "Huitièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}</strong> — pensez à valider vos pronostics avant la fermeture !
               </p>
               <button style={{ ...styles.btnPrimary, background: "#f97316" }}
                 onClick={() => {
@@ -790,12 +790,12 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
                     setCurrentPlayer(updated.find(p => p.id === player.id));
                   }
                 }}>
-                🔒 Valider mes pronostics — {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}
+                🔒 Valider mes pronostics — {{ R16: "Seizièmes", R8: "Huitièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]}
               </button>
             </div>
           )}
           {openPhase !== "none" && (player.lockedKoPhases || []).includes(openPhase) && (
-            <p style={{ ...styles.hint, color: "#22c55e", marginTop: 8 }}>✅ Pronostics des {{ R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]} verrouillés.</p>
+            <p style={{ ...styles.hint, color: "#22c55e", marginTop: 8 }}>✅ Pronostics des {{ R16: "Seizièmes", R8: "Huitièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[openPhase]} verrouillés.</p>
           )}
         </div>
       )}
@@ -1164,7 +1164,7 @@ function GroupStandingsCard({ group, groupResults, detail, qualified8 }) {
 // ─── TABLEAU FIFA OFFICIEL ────────────────────────────────────────────────────
 
 const R16_BRACKET = [
-  // Matchs 73-88 selon tableau officiel FIFA CDM 2026
+  // Seizièmes de finale (32 → 16 équipes) — Matchs 73-88 selon tableau officiel FIFA CDM 2026
   { id: "R16_1",  home: { type: "2e",  group: "A" }, away: { type: "2e",  group: "B" } },   // M73
   { id: "R16_2",  home: { type: "1er", group: "E" }, away: { type: "3e",  slots: ["A","B","C","D","F"] } }, // M74
   { id: "R16_3",  home: { type: "1er", group: "F" }, away: { type: "2e",  group: "C" } },   // M75
@@ -1183,28 +1183,35 @@ const R16_BRACKET = [
   { id: "R16_16", home: { type: "2e",  group: "D" }, away: { type: "2e",  group: "G" } },   // M88
 ];
 
+const R8_BRACKET = [
+  // Huitièmes de finale (16 → 8 équipes) — vainqueurs des seizièmes
+  { id: "R8_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } },
+  { id: "R8_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } },
+  { id: "R8_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } },
+  { id: "R8_4", home: { winner: "R16_7"  }, away: { winner: "R16_8"  } },
+  { id: "R8_5", home: { winner: "R16_9"  }, away: { winner: "R16_10" } },
+  { id: "R8_6", home: { winner: "R16_11" }, away: { winner: "R16_12" } },
+  { id: "R8_7", home: { winner: "R16_13" }, away: { winner: "R16_14" } },
+  { id: "R8_8", home: { winner: "R16_15" }, away: { winner: "R16_16" } },
+];
+
 const QF_BRACKET = [
-  // Quarts selon bracket FIFA officiel
-  { id: "QF_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } }, // V73 vs V74
-  { id: "QF_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } }, // V75 vs V76
-  { id: "QF_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } }, // V77 vs V78
-  { id: "QF_4", home: { winner: "R16_7"  }, away: { winner: "R16_8"  } }, // V79 vs V80
-  { id: "QF_5", home: { winner: "R16_9"  }, away: { winner: "R16_10" } }, // V81 vs V82
-  { id: "QF_6", home: { winner: "R16_11" }, away: { winner: "R16_12" } }, // V83 vs V84
-  { id: "QF_7", home: { winner: "R16_13" }, away: { winner: "R16_14" } }, // V85 vs V86
-  { id: "QF_8", home: { winner: "R16_15" }, away: { winner: "R16_16" } }, // V87 vs V88
+  // Quarts de finale (8 → 4 équipes) — vainqueurs des huitièmes
+  { id: "QF_1", home: { winner: "R8_1" }, away: { winner: "R8_2" } },
+  { id: "QF_2", home: { winner: "R8_3" }, away: { winner: "R8_4" } },
+  { id: "QF_3", home: { winner: "R8_5" }, away: { winner: "R8_6" } },
+  { id: "QF_4", home: { winner: "R8_7" }, away: { winner: "R8_8" } },
 ];
 
 const SF_BRACKET = [
+  // Demi-finales (4 → 2 équipes)
   { id: "SF_1", home: { winner: "QF_1" }, away: { winner: "QF_2" } },
   { id: "SF_2", home: { winner: "QF_3" }, away: { winner: "QF_4" } },
-  { id: "SF_3", home: { winner: "QF_5" }, away: { winner: "QF_6" } },
-  { id: "SF_4", home: { winner: "QF_7" }, away: { winner: "QF_8" } },
 ];
 
 const F_BRACKET = [
+  // Finale (2 → 1)
   { id: "F_1", home: { winner: "SF_1" }, away: { winner: "SF_2" } },
-  { id: "F_2", home: { winner: "SF_3" }, away: { winner: "SF_4" } },
 ];
 
 // Retourne les équipes mathématiquement certaines même si le groupe n'est pas terminé
@@ -1227,17 +1234,44 @@ function calcCertainQualified(groupResults) {
       return { ...s, maxPts: s.pts + matchesLeft * 3 };
     });
 
-    // 1er certain : si l'équipe en tête a plus de points que le max possible du 2e
-    if (teamsData[0].pts > teamsData[1].maxPts) {
+    // 1er certain : l'équipe en tête a plus de points que le max possible de TOUTES les autres équipes
+    // (donc ni la 2e, ni la 3e, ni la 4e ne peuvent la dépasser, peu importe les résultats restants)
+    const team0CertainFirst = teamsData.slice(1).every(t => teamsData[0].pts > t.maxPts);
+    if (team0CertainFirst) {
       certain.push({ team: teamsData[0].team, rank: "1er", group });
     }
-    // 2e certain : si les 2 premières ont plus de points que le max possible du 3e
-    if (teamsData[1].pts > teamsData[2].maxPts && teamsData[0].pts > teamsData[2].maxPts) {
-      if (!certain.find(c => c.group === group && c.rank === "1er")) {
-        certain.push({ team: teamsData[0].team, rank: "1er", group });
+
+    // 2e certain : on sait que les 2 premières équipes seront qualifiées (1er ou 2e)
+    // ET on sait laquelle sera 1ère / laquelle sera 2e (pas d'ambiguïté entre elles)
+    const top2CertainQualif = teamsData[0].pts > teamsData[2].maxPts && teamsData[1].pts > teamsData[2].maxPts;
+    if (top2CertainQualif) {
+      // Vérifier s'il existe encore une ambiguïté ENTRE les deux équipes elles-mêmes
+      // (ex: si elles se rencontrent encore, ou si leurs points actuels sont égaux avec des matchs restants)
+      const matchBetweenThem = GROUP_MATCHES.find(m =>
+        m.group === group &&
+        ((m.home === teamsData[0].team && m.away === teamsData[1].team) ||
+         (m.home === teamsData[1].team && m.away === teamsData[0].team))
+      );
+      const matchAlreadyPlayed = matchBetweenThem && groupResults?.[matchBetweenThem.id]?.homeScore !== "" && groupResults?.[matchBetweenThem.id]?.homeScore !== undefined;
+      const stillToPlayEachOther = matchBetweenThem && !matchAlreadyPlayed;
+
+      // Si elles ne se rencontrent plus, et que l'ordre entre elles ne peut plus changer (l'une a strictement plus de points que le max possible de l'autre), l'ordre est figé
+      const orderFixed = !stillToPlayEachOther && (
+        teamsData[0].pts > teamsData[1].maxPts || teamsData[1].pts > teamsData[0].maxPts || teamsData[0].played === 3
+      );
+
+      if (orderFixed) {
+        // L'ordre 1er/2e est connu avec certitude
+        if (!certain.find(c => c.group === group && c.rank === "1er")) {
+          certain.push({ team: teamsData[0].team, rank: "1er", group });
+        }
+        certain.push({ team: teamsData[1].team, rank: "2e", group });
+      } else {
+        // Les deux équipes sont assurées de la qualif, mais on ne sait pas encore qui sera 1er/2e
+        // → on ne les assigne PAS pour éviter d'afficher un faux ordre
       }
-      certain.push({ team: teamsData[1].team, rank: "2e", group });
     }
+
     // Si groupe terminé : ajouter tous les qualifiés directs
     if (matchesPlayed === 6) {
       if (!certain.find(c => c.group === group && c.rank === "1er"))
@@ -1332,7 +1366,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
   // Dictionnaires vainqueurs réels et pronostiqués pour propagation
   const realWinners = {};
   const predWinners = {};
-  ["R16","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","F"].forEach(phase => {
     Object.entries(results.koResults?.[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) realWinners[mid] = v.winner;
     });
@@ -1345,13 +1379,14 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
 
   const allPhases = [
     { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
+    { key: "R8",  label: "Huitièmes de finale", bracket: R8_BRACKET },
     { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
 
   // Ordre des phases pour savoir lesquelles sont "passées"
-  const phaseOrder = ["R16", "QF", "SF", "F"];
+  const phaseOrder = ["R16", "R8", "QF", "SF", "F"];
   const openIdx = phaseOrder.indexOf(openPhase);
 
   return (
@@ -1572,15 +1607,61 @@ function GrillesScreen({ players, results, currentPlayer }) {
       {/* Bonus */}
       <div style={styles.groupSection}>
         <h3 style={styles.groupTitle}>🌟 Pronos bonus</h3>
-        <div style={{ fontSize: 13, padding: "4px 0" }}>🏆 Vainqueur : <strong>{flag(selected.bonusPredictions?.winner || "")} {selected.bonusPredictions?.winner || "—"}</strong></div>
-        <div style={{ fontSize: 13, padding: "4px 0" }}>⚽ Meilleur buteur : <strong>{selected.bonusPredictions?.topScorer || "—"}</strong></div>
+        {(() => {
+          const { detail } = calcScore(selected, results);
+          const winnerOk = detail["bonus_winner"];
+          const scorerOk = detail["bonus_topScorer"];
+          return (
+            <>
+              <div style={{ display:"flex", alignItems:"center", gap:8, padding: "4px 0" }}>
+                <span style={{ flex:1, fontSize: 13 }}>🏆 Vainqueur : <strong>{flag(selected.bonusPredictions?.winner || "")} {selected.bonusPredictions?.winner || "—"}</strong></span>
+                {results.bonusResults?.winner && (
+                  winnerOk
+                    ? <span style={{ ...styles.ptsBadge, background:"#22c55e" }}>+5</span>
+                    : <span style={{ ...styles.ptsBadge, background:"#ef4444" }}>0</span>
+                )}
+              </div>
+              <div style={{ display:"flex", alignItems:"center", gap:8, padding: "4px 0" }}>
+                <span style={{ flex:1, fontSize: 13 }}>⚽ Meilleur buteur : <strong>{selected.bonusPredictions?.topScorer || "—"}</strong></span>
+                {results.bonusResults?.topScorer && (
+                  scorerOk
+                    ? <span style={{ ...styles.ptsBadge, background:"#22c55e" }}>+5</span>
+                    : <span style={{ ...styles.ptsBadge, background:"#ef4444" }}>0</span>
+                )}
+              </div>
+            </>
+          );
+        })()}
       </div>
 
+      {/* Points classement de groupe */}
+      {(() => {
+        const { detail } = calcScore(selected, results);
+        const rankEntries = Object.entries(detail).filter(([k,v]) => k.startsWith("rank_") && v > 0);
+        if (rankEntries.length === 0) return null;
+        const byGroup = {};
+        rankEntries.forEach(([k, v]) => {
+          const group = k.split("_")[1];
+          byGroup[group] = (byGroup[group] || 0) + v;
+        });
+        return (
+          <div style={styles.groupSection}>
+            <h3 style={styles.groupTitle}>📊 Points classement de groupe</h3>
+            {Object.entries(byGroup).map(([group, pts]) => (
+              <div key={group} style={{ display:"flex", justifyContent:"space-between", padding:"4px 0", fontSize:13 }}>
+                <span>Groupe {group}</span>
+                <span style={{ ...styles.ptsBadge, background:"#3b82f6" }}>+{pts} pts</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
       {/* Pronos phase finale */}
-      {["R16","QF","SF","F"].map(phase => {
+      {["R16","R8","QF","SF","F"].map(phase => {
         const phasePreds = selected.koPredictions?.[phase] || [];
         const phaseResults = results.koResults?.[phase] || {};
-        const phaseLabel = { R16:"Seizièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+        const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
         const isLocked = (selected.lockedKoPhases || []).includes(phase);
         if (!isLocked || phasePreds.length === 0) return null;
         const { detail } = calcScore(selected, results);
@@ -1614,15 +1695,19 @@ function GrillesScreen({ players, results, currentPlayer }) {
           return p && p.home !== "";
         });
         if (!hasPreds) return null;
+        const { detail } = calcScore(selected, results);
+        const groupRankPts = [0,1,2,3].reduce((acc,i) => acc + (detail[`rank_${group}_${i}`] || 0), 0);
         return (
           <div key={group} style={styles.groupSection}>
-            <h3 style={styles.groupTitle}>Groupe {group}</h3>
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom: 6 }}>
+              <h3 style={{ ...styles.groupTitle, margin:0 }}>Groupe {group}</h3>
+              {groupRankPts > 0 && <span style={{ ...styles.ptsBadge, background:"#3b82f6" }}>+{groupRankPts} classement</span>}
+            </div>
             {groupMatches.map(m => {
               const pred = selected.predictions?.find(p => p.matchId === m.id);
               if (!pred || pred.home === "") return null;
               const real = results.groupResults?.[m.id];
               const hasResult = real && real.homeScore !== "";
-              const { detail } = calcScore(selected, results);
               const pts = detail[m.id];
               return (
                 <div key={m.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"5px 0", borderBottom:`1px solid ${C.border}`, fontSize:12, flexWrap:"wrap" }}>
@@ -1903,7 +1988,7 @@ function AdminKO({ results, updateResults }) {
 
   // Vainqueurs déjà saisis pour la propagation
   const savedWinners = {};
-  ["R16","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","F"].forEach(phase => {
     Object.entries(local[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) savedWinners[mid] = v.winner;
     });
@@ -1926,6 +2011,7 @@ function AdminKO({ results, updateResults }) {
 
   const allPhases = [
     { key: "R16", label: "Seizièmes de finale", bracket: R16_BRACKET },
+    { key: "R8",  label: "Huitièmes de finale", bracket: R8_BRACKET },
     { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
@@ -2004,13 +2090,14 @@ function AdminKO({ results, updateResults }) {
 }
 
 function AdminPhases({ results, updateResults, players, updatePlayers }) {
-  const phaseOrder = ["none", "R16", "QF", "SF", "F"];
+  const phaseOrder = ["none", "R16", "R8", "QF", "SF", "F"];
   const phases = [
     { key: "none", label: "⏳ Phase de poules", desc: "Pronostics phase finale fermés — les joueurs saisissent leurs scores de poules." },
-    { key: "R16",  label: "Seizièmes de finale", desc: "Les joueurs pronostiquent les 16 matchs des seizièmes. Les poules précédentes sont verrouillées." },
-    { key: "QF",   label: "Quarts de finale",     desc: "Les joueurs pronostiquent les 8 quarts de finale. Les seizièmes sont verrouillés." },
-    { key: "SF",   label: "Demi-finales",         desc: "Les joueurs pronostiquent les 4 demi-finales. Les quarts sont verrouillés." },
-    { key: "F",    label: "Finale",               desc: "Les joueurs pronostiquent la finale. Les demi-finales sont verrouillées." },
+    { key: "R16",  label: "Seizièmes de finale", desc: "Les joueurs pronostiquent les 16 matchs des seizièmes (32→16). Les poules précédentes sont verrouillées." },
+    { key: "R8",   label: "Huitièmes de finale", desc: "Les joueurs pronostiquent les 8 huitièmes (16→8). Les seizièmes sont verrouillés." },
+    { key: "QF",   label: "Quarts de finale",     desc: "Les joueurs pronostiquent les 4 quarts (8→4). Les huitièmes sont verrouillés." },
+    { key: "SF",   label: "Demi-finales",         desc: "Les joueurs pronostiquent les 2 demi-finales (4→2). Les quarts sont verrouillés." },
+    { key: "F",    label: "Finale",               desc: "Les joueurs pronostiquent la finale (2→1). Les demi-finales sont verrouillées." },
   ];
   const current = results.openKoPhase || "none";
   const currentIdx = phaseOrder.indexOf(current);
@@ -2094,7 +2181,7 @@ function AdminPhases({ results, updateResults, players, updatePlayers }) {
         <strong style={{ color: C.text }}>Workflow recommandé :</strong><br/>
         1. Avant le tournoi → laisser sur "Phase de poules"<br/>
         2. Après les poules → saisir scores + ouvrir "Seizièmes"<br/>
-        3. Après les seizièmes → saisir résultats phase finale + ouvrir "Quarts"<br/>
+        3. Après les seizièmes → saisir résultats des seizièmes + ouvrir "Huitièmes" puis "Quarts"<br/>
         4. Et ainsi de suite jusqu'à la Finale
       </div>
     </div>
@@ -2344,8 +2431,8 @@ function AdminDetail({ players, results }) {
       {koTotal > 0 && (
         <div style={styles.groupSection}>
           <h3 style={styles.groupTitle}>🏆 Détail phase finale</h3>
-          {["R16","QF","SF","F"].map(phase => {
-            const phaseLabel = { R16:"Seizièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+          {["R16","R8","QF","SF","F"].map(phase => {
+            const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
             const phaseResults = results.koResults?.[phase] || {};
             const phasePreds = player.koPredictions?.[phase] || [];
             const phasePts = Object.entries(detail).filter(([k,v]) => k.startsWith(`ko_${phase}_`) && v > 0);
@@ -2404,7 +2491,7 @@ function AdminBracket({ results, updateResults }) {
 
   // Vainqueurs réels saisis
   const realWinners = {};
-  ["R16","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","F"].forEach(phase => {
     Object.entries(results.koResults?.[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) realWinners[mid] = v.winner;
     });
@@ -2488,7 +2575,7 @@ function AdminPlayers({ players, updatePlayers }) {
   }
 
   function unlockKoPhase(id, phase) {
-    const label = { R16: "Seizièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[phase];
+    const label = { R16: "Seizièmes", R8: "Huitièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[phase];
 
     updatePlayers(players.map(p => p.id === id
       ? { ...p, lockedKoPhases: (p.lockedKoPhases || []).filter(ph => ph !== phase) }
@@ -2536,8 +2623,8 @@ function AdminPlayers({ players, updatePlayers }) {
             </span>
 
             {/* Verrous phases finale */}
-            {["R16","QF","SF","F"].map(phase => {
-              const label = { R16:"1/16", QF:"1/8", SF:"1/2", F:"Finale" }[phase];
+            {["R16","R8","QF","SF","F"].map(phase => {
+              const label = { R16:"1/16", R8:"1/8", QF:"1/4", SF:"1/2", F:"Finale" }[phase];
               const isLocked = (p.lockedKoPhases || []).includes(phase);
               if (!isLocked) return null;
               return (
