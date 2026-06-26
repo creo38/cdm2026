@@ -146,7 +146,124 @@ function calcGroupStandingsRaw(group, groupResults) {
   return rows;
 }
 
-// ─── SCORE CALCULATION ───────────────────────────────────────────────────────
+// ─── SCORE CALCULATION V2 (barème alternatif pour comparatif admin) ──────────
+// Score exact = 2 pts · Bon vainqueur = 1 pt
+// Équipe qualifiée pronostiquée (1er/2e/meilleur 3e) = 1 pt
+// Équipe qualifiée ET bien placée (bon rang exact) = 2 pts
+// Le 4e de chaque groupe ne rapporte jamais de point
+
+function calcScoreV2(player, results) {
+  let total = 0;
+  const detail = {};
+
+  // Pronostics matchs de poules — score exact 2 pts, bon vainqueur 1 pt
+  (player.predictions || []).forEach((pred) => {
+    const res = results.groupResults?.[pred.matchId];
+    if (!res || res.homeScore === "" || res.awayScore === "") return;
+    const realHome = parseInt(res.homeScore);
+    const realAway = parseInt(res.awayScore);
+    const predHome = parseInt(pred.home);
+    const predAway = parseInt(pred.away);
+    if (isNaN(predHome) || isNaN(predAway)) return;
+
+    if (predHome === realHome && predAway === realAway) {
+      total += 2;
+      detail[pred.matchId] = 2;
+    } else {
+      const realWinner = realHome > realAway ? "home" : realHome < realAway ? "away" : "draw";
+      const predWinner = predHome > predAway ? "home" : predHome < predAway ? "away" : "draw";
+      if (realWinner === predWinner) {
+        total += 1;
+        detail[pred.matchId] = 1;
+      } else {
+        detail[pred.matchId] = 0;
+      }
+    }
+  });
+
+  // Classement de groupe — uniquement quand le groupe est terminé (6 matchs joués)
+  Object.keys(GROUPS).forEach(group => {
+    const realStandings = calcGroupStandingsRaw(group, results?.groupResults || {});
+    const totalPlayed = realStandings.reduce((sum, s) => sum + s.played, 0) / 2;
+    if (totalPlayed < 6) return; // groupe pas terminé
+
+    const fakePreds = {};
+    let groupPredCount = 0;
+    (player.predictions || []).forEach(pred => {
+      if (pred.home !== "" && pred.away !== "" && !isNaN(parseInt(pred.home)) && !isNaN(parseInt(pred.away))) {
+        const match = GROUP_MATCHES.find(m => m.id === pred.matchId && m.group === group);
+        if (match) {
+          fakePreds[pred.matchId] = { homeScore: pred.home, awayScore: pred.away };
+          groupPredCount++;
+        }
+      }
+    });
+    if (groupPredCount < 6) return;
+
+    const predStandings = calcGroupStandingsRaw(group, fakePreds);
+    // Les 2 premiers réels + savoir si le réel 3e est un meilleur 3e qualifié
+    const best3rds = calcBest3rds(results.groupResults).map(t => t.team);
+    const realQualified = new Set([
+      realStandings[0]?.team,
+      realStandings[1]?.team,
+      ...(best3rds.includes(realStandings[2]?.team) ? [realStandings[2].team] : [])
+    ]);
+
+    // On exclut systématiquement le 4e pronostiqué (idx 3) du calcul
+    predStandings.forEach((s, idx) => {
+      if (idx === 3) return; // le 4e ne rapporte jamais de point
+      const isQualifiedPred = realQualified.has(s.team);
+      if (!isQualifiedPred) return;
+      // Équipe bien placée (rang exact) ?
+      const wellPlaced = realStandings[idx]?.team === s.team;
+      if (wellPlaced) {
+        total += 2;
+        detail[`rankv2_${group}_${idx}`] = 2;
+      } else {
+        total += 1;
+        detail[`rankv2_${group}_${idx}`] = 1;
+      }
+    });
+  });
+
+  // Pronostics phase finale — identique au système actuel (pas de changement demandé)
+  Object.entries(player.koPredictions || {}).forEach(([phase, preds]) => {
+    const realPreds = results.koResults?.[phase] || {};
+    (preds || []).forEach((pred) => {
+      if (!pred.matchId || !pred.winner) return;
+      const real = realPreds[pred.matchId];
+      if (!real?.winner) return;
+      const winnerOk = pred.winner.toLowerCase().trim() === real.winner.toLowerCase().trim();
+      if (!winnerOk) { detail[`ko_${phase}_${pred.matchId}`] = 0; return; }
+      const scoreOk =
+        pred.homeScore !== undefined && pred.awayScore !== undefined &&
+        real.homeScore !== undefined && real.awayScore !== undefined &&
+        parseInt(pred.homeScore) === parseInt(real.homeScore) &&
+        parseInt(pred.awayScore) === parseInt(real.awayScore);
+      if (scoreOk) { total += 3; detail[`ko_${phase}_${pred.matchId}`] = 3; }
+      else { total += 2; detail[`ko_${phase}_${pred.matchId}`] = 2; }
+    });
+  });
+
+  // Bonus vainqueur / buteur — identiques
+  if (player.bonusPredictions?.winner && results.bonusResults?.winner) {
+    if (player.bonusPredictions.winner.toLowerCase().trim() === results.bonusResults.winner.toLowerCase().trim()) {
+      total += 5;
+      detail["bonus_winner"] = 5;
+    }
+  }
+  if (player.bonusPredictions?.topScorer && results.bonusResults?.topScorer) {
+    const normalize = s => s.toLowerCase().trim().replace(/\s*\(.*\)/, "").trim();
+    if (normalize(player.bonusPredictions.topScorer) === normalize(results.bonusResults.topScorer)) {
+      total += 5;
+      detail["bonus_topScorer"] = 5;
+    }
+  }
+
+  return { total, detail };
+}
+
+
 
 function calcScore(player, results) {
   let total = 0;
@@ -1848,6 +1965,7 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
         <button style={{ ...styles.tab, ...(tab === "bonus" ? styles.tabActive : {}) }} onClick={() => setTab("bonus")}>🌟 Bonus</button>
         <button style={{ ...styles.tab, ...(tab === "players" ? styles.tabActive : {}) }} onClick={() => setTab("players")}>👥 Joueurs</button>
         <button style={{ ...styles.tab, ...(tab === "detail" ? styles.tabActive : {}) }} onClick={() => setTab("detail")}>🔍 Détail points</button>
+        <button style={{ ...styles.tab, ...(tab === "compare" ? styles.tabActive : {}), borderColor: "#a855f7" }} onClick={() => setTab("compare")}>📊 Comparatif</button>
         <button style={{ ...styles.tab, ...(tab === "test" ? styles.tabActive : {}), borderColor: "#7c3aed" }} onClick={() => setTab("test")}>🧪 Test</button>
       </div>
       {tab === "scores" && <AdminScores results={results} updateResults={updateResults} />}
@@ -1857,6 +1975,7 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
       {tab === "bonus" && <AdminBonus results={results} updateResults={updateResults} />}
       {tab === "players" && <AdminPlayers players={players} updatePlayers={updatePlayers} />}
       {tab === "detail" && <AdminDetail players={players} results={results} />}
+      {tab === "compare" && <AdminCompare players={players} results={results} />}
       {tab === "test" && <AdminTest results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
     </div>
   );
@@ -2343,6 +2462,72 @@ function AdminTest({ results, updateResults, players, updatePlayers }) {
 }
 
 // ─── ADMIN DETAIL POINTS ─────────────────────────────────────────────────────
+
+// ─── ADMIN COMPARATIF BARÈMES ─────────────────────────────────────────────────
+
+function AdminCompare({ players, results }) {
+  const ranked = players
+    .map(p => {
+      const v1 = calcScore(p, results);
+      const v2 = calcScoreV2(p, results);
+      return { ...p, totalV1: v1.total, totalV2: v2.total, diff: v2.total - v1.total };
+    })
+    .sort((a, b) => b.totalV1 - a.totalV1);
+
+  const rankedV2 = [...ranked].sort((a, b) => b.totalV2 - a.totalV2);
+  const v2Rank = {};
+  rankedV2.forEach((p, i) => { v2Rank[p.id] = i + 1; });
+  const v1Rank = {};
+  ranked.forEach((p, i) => { v1Rank[p.id] = i + 1; });
+
+  return (
+    <div>
+      <div style={{ background: "#1a0d2e", border: "1px solid #a855f7", borderRadius: 10, padding: 14, marginBottom: 16 }}>
+        <strong style={{ color: "#c084fc" }}>📊 Comparatif barèmes — visible admin uniquement</strong>
+        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.7 }}>
+          <strong style={{ color: C.text }}>Barème actuel (V1)</strong> : score exact 3 pts · bon vainqueur 1 pt · classement 2 pts/place<br/>
+          <strong style={{ color: C.text }}>Barème alternatif (V2)</strong> : score exact 2 pts · bon vainqueur 1 pt · équipe qualifiée 1 pt · bien placée 2 pts · 4e jamais compté
+        </div>
+      </div>
+
+      <div style={styles.groupSection}>
+        <div style={styles.standingsHeader}>
+          <span style={{ flex: 1, fontSize: 11, color: C.textMuted, textTransform: "uppercase" }}>Joueur</span>
+          <span style={{ ...styles.standingsCol, minWidth: 70 }}>V1 actuel</span>
+          <span style={{ ...styles.standingsCol, minWidth: 70 }}>V2 alt.</span>
+          <span style={{ ...styles.standingsCol, minWidth: 60 }}>Écart</span>
+          <span style={{ ...styles.standingsCol, minWidth: 60 }}>Rang V1</span>
+          <span style={{ ...styles.standingsCol, minWidth: 60 }}>Rang V2</span>
+        </div>
+        {ranked.map(p => {
+          const rankChanged = v1Rank[p.id] !== v2Rank[p.id];
+          return (
+            <div key={p.id} style={{
+              ...styles.standingsRow,
+              background: rankChanged ? "#1a1208" : "transparent",
+              borderLeft: rankChanged ? "3px solid #f59e0b" : "3px solid transparent"
+            }}>
+              <span style={{ flex: 1, fontSize: 13 }}>{p.name}</span>
+              <span style={{ ...styles.standingsCol, minWidth: 70, fontWeight: 700, color: C.accent }}>{p.totalV1}</span>
+              <span style={{ ...styles.standingsCol, minWidth: 70, fontWeight: 700, color: "#a855f7" }}>{p.totalV2}</span>
+              <span style={{ ...styles.standingsCol, minWidth: 60, color: p.diff > 0 ? "#22c55e" : p.diff < 0 ? "#ef4444" : C.textMuted }}>
+                {p.diff > 0 ? "+" : ""}{p.diff}
+              </span>
+              <span style={{ ...styles.standingsCol, minWidth: 60 }}>{v1Rank[p.id]}e</span>
+              <span style={{ ...styles.standingsCol, minWidth: 60, color: rankChanged ? "#f59e0b" : C.textMuted, fontWeight: rankChanged ? 700 : 400 }}>
+                {v2Rank[p.id]}e {rankChanged && (v2Rank[p.id] < v1Rank[p.id] ? "↑" : "↓")}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <p style={{ ...styles.hint, marginTop: 8 }}>
+        🟠 Ligne surlignée = le classement change entre les deux barèmes.
+      </p>
+    </div>
+  );
+}
 
 function AdminDetail({ players, results }) {
   const [selectedId, setSelectedId] = useState(players[0]?.id || "");
