@@ -809,12 +809,11 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const [saved, setSaved] = useState(false);
   const [confirmLock, setConfirmLock] = useState(false);
 
-  const isLocked = !!player.locked;       // verrou grille de poules
-  const globalLocked = !!results.locked;  // verrou admin global
-  const locked = isLocked || globalLocked; // bloque les poules
-  // Pour les phases KO : seul le verrou admin global bloque tout
-  // Le verrou de poules (player.locked) ne doit PAS bloquer les phases KO
-  const lockedKO = globalLocked;
+  const isLocked = !!player.locked;            // verrou grille de poules (joueur)
+  const globalLocked = !!results.locked;        // verrou admin global poules
+  const locked = isLocked || globalLocked;      // bloque les poules
+  // Pour les phases KO : un verrou admin DÉDIÉ (results.koGloballyLocked), indépendant des poules
+  const lockedKO = !!results.koGloballyLocked;
 
   const { total, detail } = calcScore(player, results);
 
@@ -1949,14 +1948,25 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
         <h2 style={styles.formTitle}>⚙️ Administration</h2>
         <button style={styles.btnDanger} onClick={() => setAdminAuth(false)}>Déconnexion</button>
       </div>
-      {/* Verrou global */}
+      {/* Verrou global poules */}
       <div style={{ background: results.locked ? "#0d2015" : "#1a1208", border: `1px solid ${results.locked ? "#22c55e" : "#f59e0b"}`, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <span style={{ flex: 1, fontSize: 13, color: results.locked ? "#22c55e" : "#f59e0b" }}>
-          {results.locked ? "🔒 Pronostics verrouillés — aucune modification possible pour les joueurs" : "🔓 Pronostics ouverts — les joueurs peuvent encore modifier"}
+          {results.locked ? "🔒 Pronostics de poules verrouillés" : "🔓 Pronostics de poules ouverts"}
         </span>
         <button style={{ ...styles.btnPrimary, width: "auto", background: results.locked ? "#ef4444" : "#22c55e", fontSize: 13, padding: "8px 14px" }}
           onClick={() => updateResults({ ...results, locked: !results.locked })}>
-          {results.locked ? "🔓 Déverrouiller" : "🔒 Verrouiller tous les pronostics"}
+          {results.locked ? "🔓 Déverrouiller poules" : "🔒 Verrouiller toutes les poules"}
+        </button>
+      </div>
+
+      {/* Verrou global phases finales — indépendant du verrou poules */}
+      <div style={{ background: results.koGloballyLocked ? "#0d2015" : "#1a1208", border: `1px solid ${results.koGloballyLocked ? "#22c55e" : "#f59e0b"}`, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+        <span style={{ flex: 1, fontSize: 13, color: results.koGloballyLocked ? "#22c55e" : "#f59e0b" }}>
+          {results.koGloballyLocked ? "🔒 Pronostics de phase finale verrouillés" : "🔓 Pronostics de phase finale ouverts"}
+        </span>
+        <button style={{ ...styles.btnPrimary, width: "auto", background: results.koGloballyLocked ? "#ef4444" : "#22c55e", fontSize: 13, padding: "8px 14px" }}
+          onClick={() => updateResults({ ...results, koGloballyLocked: !results.koGloballyLocked })}>
+          {results.koGloballyLocked ? "🔓 Déverrouiller phase finale" : "🔒 Verrouiller toute la phase finale"}
         </button>
       </div>
       <div style={styles.tabs}>
