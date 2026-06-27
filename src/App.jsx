@@ -1529,6 +1529,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
         const isFuture = openIdx < phaseOrder.indexOf(key) && openPhase !== "none";
         const isNoneOpen = openPhase === "none";
         const phaseAdminLocked = lockedKoPhases.includes(key);
+        // 'locked' ici = lockedKO transmis par PlayerScreen (verrou dédié phase finale, indépendant des poules)
         const phaseLockedForInput = locked || phaseAdminLocked || (!isOpen);
 
         return (
@@ -1561,7 +1562,20 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
 
               const updatePred = (field, value) => {
                 const base = pred || { matchId: match.id };
-                const updated = [...phasePreds.filter(p => p.matchId !== match.id), { ...base, [field]: value }];
+                const next = { ...base, [field]: value };
+
+                // Auto-déduction du vainqueur quand le joueur saisit un score
+                if ((field === "homeScore" || field === "awayScore") && homeDisplay && awayDisplay) {
+                  const h = parseInt(field === "homeScore" ? value : next.homeScore);
+                  const a = parseInt(field === "awayScore" ? value : next.awayScore);
+                  if (!isNaN(h) && !isNaN(a)) {
+                    if (h > a) next.winner = homeDisplay;
+                    else if (a > h) next.winner = awayDisplay;
+                    // Égalité avant TAB : on laisse le joueur choisir lui-même qui passe aux tirs au but
+                  }
+                }
+
+                const updated = [...phasePreds.filter(p => p.matchId !== match.id), next];
                 setKoPreds(k => ({ ...k, [key]: updated }));
               };
 
@@ -2131,14 +2145,29 @@ function AdminKO({ results, updateResults }) {
     setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
-  function setField(phaseKey, matchId, field, value) {
-    setLocal(l => ({
-      ...l,
-      [phaseKey]: {
-        ...(l[phaseKey] || {}),
-        [matchId]: { ...(l[phaseKey]?.[matchId] || {}), [field]: value }
+  function setField(phaseKey, matchId, field, value, homeTeam, awayTeam) {
+    setLocal(l => {
+      const current = { ...(l[phaseKey]?.[matchId] || {}), [field]: value };
+
+      // Auto-déduction du vainqueur quand on saisit un score (pas pour un match nul)
+      if ((field === "homeScore" || field === "awayScore") && homeTeam && awayTeam) {
+        const h = parseInt(field === "homeScore" ? value : current.homeScore);
+        const a = parseInt(field === "awayScore" ? value : current.awayScore);
+        if (!isNaN(h) && !isNaN(a)) {
+          if (h > a) current.winner = homeTeam;
+          else if (a > h) current.winner = awayTeam;
+          // En cas d'égalité (avant TAB), on laisse le vainqueur déjà saisi ou vide — le TAB décidera
+        }
       }
-    }));
+
+      return {
+        ...l,
+        [phaseKey]: {
+          ...(l[phaseKey] || {}),
+          [matchId]: current
+        }
+      };
+    });
   }
 
   function toggleConfirm(phaseKey, matchId, homeTeam, awayTeam) {
@@ -2218,11 +2247,11 @@ function AdminKO({ results, updateResults }) {
                 <div style={styles.koMatchInputs}>
                   <input style={{ ...styles.scoreInput, width: 52 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
                     value={m.homeScore ?? ""}
-                    onChange={e => setField(key, match.id, "homeScore", e.target.value)} />
+                    onChange={e => setField(key, match.id, "homeScore", e.target.value, homeTeam, awayTeam)} />
                   <span style={styles.vs}>–</span>
                   <input style={{ ...styles.scoreInput, width: 52 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
                     value={m.awayScore ?? ""}
-                    onChange={e => setField(key, match.id, "awayScore", e.target.value)} />
+                    onChange={e => setField(key, match.id, "awayScore", e.target.value, homeTeam, awayTeam)} />
                   <span style={styles.koSep}>Vainqueur :</span>
                   {teamsForMatch.length === 2
                     ? <select style={{ ...styles.select, flex: 1 }}
