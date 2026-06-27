@@ -1553,9 +1553,11 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
               const homePred = resolveSlot(match.home, certainQualified, predWinners, thirdAssignments, match.id, "home");
               const awayPred = resolveSlot(match.away, certainQualified, predWinners, thirdAssignments, match.id, "away");
 
-              // Pour l'affichage : priorité au réel, sinon pronostiqué
-              const homeDisplay = homeReal || homePred;
-              const awayDisplay = awayReal || awayPred;
+              // Pour l'affichage : équipe validée manuellement par l'admin en priorité absolue,
+              // sinon résultat réel, sinon pronostiqué
+              const confirmedMatch = (results.confirmedMatches || {})[`${key}_${match.id}`];
+              const homeDisplay = confirmedMatch?.home || homeReal || homePred;
+              const awayDisplay = confirmedMatch?.away || awayReal || awayPred;
               const teamsForSelect = [homeDisplay, awayDisplay].filter(Boolean);
 
               const updatePred = (field, value) => {
@@ -1612,7 +1614,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
                             {teamsForSelect.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
                           </select>
                         : <div style={{ ...styles.koInput, flex: 1, background: C.surface2, opacity: 0.7, padding: "8px 10px", borderRadius: 8, fontSize: 13, color: pred?.winner ? C.text : C.textMuted }}>
-                            {pred?.winner ? <>{flag(pred.winner)} {pred.winner}</> : teamsForSelect.length ? `${flag(teamsForSelect[0]||"")} ${teamsForSelect[0]||""}` : "En attente…"}
+                            {pred?.winner ? <>{flag(pred.winner)} {pred.winner}</> : "En attente des deux équipes…"}
                           </div>
                       }
                     </div>
@@ -2098,6 +2100,7 @@ function AdminRankings({ results, updateResults }) {
 
 function AdminKO({ results, updateResults }) {
   const [local, setLocal] = useState(results.koResults || {});
+  const [confirmed, setConfirmed] = useState(results.confirmedMatches || {});
   const [saved, setSaved] = useState(false);
 
   // Calcule les qualifiés depuis les vrais scores + overrides de classement
@@ -2114,7 +2117,7 @@ function AdminKO({ results, updateResults }) {
   });
 
   function save() {
-    updateResults({ ...results, koResults: local });
+    updateResults({ ...results, koResults: local, confirmedMatches: confirmed });
     setSaved(true); setTimeout(() => setSaved(false), 2000);
   }
 
@@ -2126,6 +2129,20 @@ function AdminKO({ results, updateResults }) {
         [matchId]: { ...(l[phaseKey]?.[matchId] || {}), [field]: value }
       }
     }));
+  }
+
+  function toggleConfirm(phaseKey, matchId, homeTeam, awayTeam) {
+    const key = `${phaseKey}_${matchId}`;
+    setConfirmed(c => {
+      if (c[key]) {
+        // Déjà confirmé → on retire
+        const next = { ...c };
+        delete next[key];
+        return next;
+      }
+      // On confirme avec les équipes actuellement calculées
+      return { ...c, [key]: { home: homeTeam, away: awayTeam } };
+    });
   }
 
   const allPhases = [
@@ -2144,7 +2161,8 @@ function AdminKO({ results, updateResults }) {
           • Score = score à la fin du temps réglementaire <strong>ou des prolongations</strong><br/>
           • Cocher "TAB" si le match a été décidé aux tirs au but<br/>
           • Vainqueur = équipe qualifiée (même si TAB)<br/>
-          • Les équipes sont <strong>calculées automatiquement</strong> depuis les résultats de poules
+          • Les équipes sont <strong>calculées automatiquement</strong> depuis les résultats de poules<br/>
+          • <strong style={{ color: "#22c55e" }}>✅ Valider ce match</strong> = autorise les joueurs à pronostiquer ce match précis même si toutes les poules ne sont pas encore terminées
         </div>
       </div>
       {allPhases.map(({ key, label, bracket }) => (
@@ -2156,8 +2174,9 @@ function AdminKO({ results, updateResults }) {
             const homeTeam = resolveSlot(match.home, certain, savedWinners, thirdAssignments, match.id, "home");
             const awayTeam = resolveSlot(match.away, certain, savedWinners, thirdAssignments, match.id, "away");
             const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
+            const isConfirmed = !!confirmed[`${key}_${match.id}`];
             return (
-              <div key={match.id} style={styles.koMatchRow}>
+              <div key={match.id} style={{ ...styles.koMatchRow, background: isConfirmed ? "#0d2015" : "transparent" }}>
                 <div style={styles.koMatchHeader}>
                   {/* Affichage des équipes */}
                   <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>
@@ -2177,6 +2196,15 @@ function AdminKO({ results, updateResults }) {
                     TAB
                   </label>
                 </div>
+
+                {/* Case de validation manuelle si les deux équipes sont connues */}
+                {teamsForMatch.length === 2 && (
+                  <label style={{ display:"flex", alignItems:"center", gap:6, fontSize:12, color: isConfirmed ? "#22c55e" : "#94a3b8", cursor:"pointer", margin:"4px 0" }}>
+                    <input type="checkbox" checked={isConfirmed} onChange={() => toggleConfirm(key, match.id, homeTeam, awayTeam)} />
+                    {isConfirmed ? "✅ Match validé — pronostiquable par les joueurs" : "Valider ce match pour les joueurs"}
+                  </label>
+                )}
+
                 <div style={styles.koMatchInputs}>
                   <input style={{ ...styles.scoreInput, width: 52 }} type="number" inputMode="numeric" min="0" max="20" placeholder="–"
                     value={m.homeScore ?? ""}
