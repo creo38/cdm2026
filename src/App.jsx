@@ -336,15 +336,15 @@ function calcScore(player, results) {
       if (!real?.winner) return;
       const winnerOk = pred.winner.toLowerCase().trim() === real.winner.toLowerCase().trim();
       if (!winnerOk) { detail[`ko_${phase}_${pred.matchId}`] = 0; return; }
-      // Score exact après prolongations = 3 pts (si pas de TAB, score normal ; si TAB, score à la fin des prolong)
+      // Score exact après prolongations = 3 + 2 (bonus équipe qualifiée) = 5 pts cumulés
       const scoreOk =
         pred.homeScore !== undefined && pred.awayScore !== undefined &&
         real.homeScore !== undefined && real.awayScore !== undefined &&
         parseInt(pred.homeScore) === parseInt(real.homeScore) &&
         parseInt(pred.awayScore) === parseInt(real.awayScore);
       if (scoreOk) {
-        total += 3;
-        detail[`ko_${phase}_${pred.matchId}`] = 3;
+        total += 5;
+        detail[`ko_${phase}_${pred.matchId}`] = 5;
       } else {
         total += 2;
         detail[`ko_${phase}_${pred.matchId}`] = 2;
@@ -642,7 +642,7 @@ function HomeScreen({ setScreen, players, results }) {
           <RuleItem icon="🎯" label="Score exact (poules)" pts="3 pts" />
           <RuleItem icon="✅" label="Bon vainqueur (poules)" pts="1 pt" />
           <RuleItem icon="📊" label="Classement de groupe" pts="2 pts / place" />
-          <RuleItem icon="🎯" label="Score exact phase finale (prolong.)" pts="3 pts" />
+          <RuleItem icon="🎯" label="Score exact phase finale (prolong.)" pts="5 pts" />
           <RuleItem icon="✅" label="Bon vainqueur phase finale (TAB ✓)" pts="2 pts" />
           <RuleItem icon="🏆" label="Vainqueur final CDM" pts="+5 pts bonus" />
           <RuleItem icon="⚽" label="Meilleur buteur" pts="+5 pts bonus" />
@@ -1589,7 +1589,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
       <div style={styles.koRuleBox}>
         <strong>📋 Règle phase finale</strong>
         <div style={{ marginTop: 6, fontSize: 12, color: "#94a3b8", lineHeight: 1.6 }}>
-          • Score exact <em>(après prolongations)</em> + bon vainqueur = <strong style={{ color: "#22c55e" }}>3 pts</strong><br/>
+          • Score exact <em>(après prolongations)</em> + bon vainqueur = <strong style={{ color: "#22c55e" }}>5 pts</strong><br/>
           • Bon vainqueur seulement <em>(TAB pris en compte)</em> = <strong style={{ color: "#f59e0b" }}>2 pts</strong>
         </div>
       </div>
@@ -1679,7 +1679,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
                   {hasResult && (
                     <div style={{ fontSize: 12, color: "#22c55e", margin: "4px 0" }}>
                       ✅ {real.winner}{real.homeScore !== undefined ? ` (${real.homeScore}–${real.awayScore}${real.penalties ? ", TAB" : ""})` : ""}
-                      {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts >= 3 ? "#22c55e" : pts === 2 ? "#f59e0b" : "#ef4444", marginLeft: 6 }}>{pts >= 3 ? "🎯 +3" : pts === 2 ? "✅ +2" : "❌ 0"}</span>}
+                      {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts >= 5 ? "#22c55e" : pts === 2 ? "#f59e0b" : "#ef4444", marginLeft: 6 }}>{pts >= 5 ? "🎯 +5" : pts === 2 ? "✅ +2" : "❌ 0"}</span>}
                     </div>
                   )}
 
@@ -1897,7 +1897,7 @@ function GrillesScreen({ players, results, currentPlayer }) {
                     {pred.homeScore !== undefined && pred.homeScore !== "" && <span style={{ color:C.textMuted }}> ({pred.homeScore}–{pred.awayScore})</span>}
                   </span>
                   {real?.winner && <span style={{ color:C.textMuted }}>Réel : {flag(real.winner)} {real.winner}</span>}
-                  {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts>=3?"#22c55e":pts===2?"#f59e0b":"#ef4444" }}>{pts>=3?"🎯+3":pts===2?"✅+2":"❌0"}</span>}
+                  {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts>=5?"#22c55e":pts===2?"#f59e0b":"#ef4444" }}>{pts>=5?"🎯+5":pts===2?"✅+2":"❌0"}</span>}
                   {!real?.winner && <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
                 </div>
               );
@@ -2957,8 +2957,8 @@ function AdminDetail({ players, results }) {
                         {pred.homeScore !== undefined && pred.homeScore !== "" && <span style={{ color:C.textMuted }}> ({pred.homeScore}–{pred.awayScore})</span>}
                       </span>
                       {hasResult && <span style={{ color:C.textMuted }}>Réel : <strong style={{ color:C.text }}>{flag(real.winner)} {real.winner}</strong></span>}
-                      {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts >= 3 ? "#22c55e" : pts === 2 ? "#f59e0b" : "#ef4444" }}>
-                        {pts >= 3 ? "🎯 +3" : pts === 2 ? "✅ +2" : "❌ 0"}
+                      {pts !== undefined && <span style={{ ...styles.ptsBadge, background: pts >= 5 ? "#22c55e" : pts === 2 ? "#f59e0b" : "#ef4444" }}>
+                        {pts >= 5 ? "🎯 +5" : pts === 2 ? "✅ +2" : "❌ 0"}
                       </span>}
                       {!hasResult && <span style={{ color:C.textMuted, fontSize:11 }}>En attente</span>}
                     </div>
