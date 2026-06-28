@@ -446,28 +446,26 @@ async function loadData(key) {
   } catch (e) { console.error("loadData error:", e); return key === "players" ? [] : null; }
 }
 
-async function saveData(key, value) {
+async function saveData(key, value, changedPlayerIds = null) {
   try {
     if (key === "players") {
-      // Upsert chaque joueur individuellement
       const players = value;
-      // Supprimer les joueurs qui n'existent plus
-      const ids = players.map(p => p.id);
-      // On fait un upsert de tous les joueurs
-      for (const player of players) {
+      // CRITIQUE : on ne réécrit QUE les joueurs explicitement modifiés (changedPlayerIds),
+      // jamais tout le tableau d'un coup — sinon on écrase les modifications faites par
+      // d'autres joueurs entre le chargement initial et cette sauvegarde (race condition).
+      const toUpsert = changedPlayerIds
+        ? players.filter(p => changedPlayerIds.includes(p.id))
+        : players; // fallback : si non précisé, on upsert tout (utilisé pour suppression/import test)
+
+      for (const player of toUpsert) {
         await supaFetch("players", {
           method: "POST",
           headers: { "Prefer": "resolution=merge-duplicates,return=minimal" },
           body: JSON.stringify({ id: player.id, data: player }),
         });
       }
-      // Supprimer les joueurs retirés
-      if (ids.length > 0) {
-        const idList = ids.map(id => `"${id}"`).join(",");
-        await supaFetch(`players?id=not.in.(${idList})`, { method: "DELETE" });
-      } else {
-        await supaFetch("players", { method: "DELETE" });
-      }
+      // La suppression des joueurs retirés ne doit se faire que dans un contexte explicite
+      // (suppression manuelle en admin), jamais lors d'une sauvegarde de pronostic normale.
     } else {
       await supaFetch("results", {
         method: "POST",
@@ -502,13 +500,25 @@ export default function App() {
     })();
   }, []);
 
-  async function updatePlayers(p) {
+  async function updatePlayers(p, changedPlayerIds = null) {
     setPlayers(p);
-    const result = await saveData("players", p);
+    const result = await saveData("players", p, changedPlayerIds);
     if (!result.success) {
       alert("⚠️ Erreur de sauvegarde ! Tes pronostics n'ont peut-être pas été enregistrés sur le serveur.\n\nDétail : " + result.error + "\n\nVérifie ta connexion internet et réessaye. Ne ferme pas l'appli avant d'avoir revu le message de confirmation.");
     }
     return result;
+  }
+
+  // Supprime explicitement un ou plusieurs joueurs de la base (action admin volontaire uniquement)
+  async function deletePlayers(idsToDelete) {
+    try {
+      const idList = idsToDelete.map(id => `"${id}"`).join(",");
+      await supaFetch(`players?id=in.(${idList})`, { method: "DELETE" });
+      return { success: true };
+    } catch (e) {
+      console.error("deletePlayers error:", e);
+      return { success: false, error: e.message || String(e) };
+    }
   }
 
   async function updateResults(r) {
@@ -534,7 +544,7 @@ export default function App() {
         {screen === "home" && <HomeScreen setScreen={setScreen} players={players} results={results} />}
         {screen === "register" && <RegisterScreen players={players} updatePlayers={updatePlayers} setScreen={setScreen} setCurrentPlayer={setCurrentPlayer} />}
         {screen === "player" && currentPlayer && <PlayerScreen player={currentPlayer} players={players} updatePlayers={updatePlayers} results={results} updateResults={updateResults} setCurrentPlayer={setCurrentPlayer} />}
-        {screen === "admin" && <AdminScreen adminAuth={adminAuth} setAdminAuth={setAdminAuth} results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
+        {screen === "admin" && <AdminScreen adminAuth={adminAuth} setAdminAuth={setAdminAuth} results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} deletePlayers={deletePlayers} />}
         {screen === "leaderboard" && <LeaderboardScreen players={players} results={results} />}
         {screen === "grilles" && <GrillesScreen players={players} results={results} currentPlayer={currentPlayer} />}
         {screen === "login" && <LoginScreen players={players} setCurrentPlayer={setCurrentPlayer} setScreen={setScreen} />}
@@ -749,7 +759,7 @@ function RegisterScreen({ players, updatePlayers, setScreen, setCurrentPlayer })
       bonusPredictions: { winner: winner.trim(), topScorer: topScorer.trim() }
     };
     const updated = [...players, newPlayer];
-    updatePlayers(updated);
+    updatePlayers(updated, [newPlayer.id]);
     setCurrentPlayer(newPlayer);
     setScreen("player");
   }
@@ -844,7 +854,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
       }
       return { ...p, predictions, koPredictions: koPreds, locked: false };
     });
-    const result = await updatePlayers(updated);
+    const result = await updatePlayers(updated, [player.id]);
     if (result && result.success) {
       setCurrentPlayer(updated.find(p => p.id === player.id));
       setSaved("draft");
@@ -861,7 +871,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
     const updated = players.map(p => p.id === player.id
       ? { ...p, predictions, koPredictions: koPreds, locked: true }
       : p);
-    const result = await updatePlayers(updated);
+    const result = await updatePlayers(updated, [player.id]);
     if (result && result.success) {
       setCurrentPlayer(updated.find(p => p.id === player.id));
       setSaved("final");
@@ -932,7 +942,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
                     const updated = players.map(p => p.id === player.id
                       ? { ...p, predictions, koPredictions: koPreds, lockedKoPhases: [...(p.lockedKoPhases || []), openPhase] }
                       : p);
-                    updatePlayers(updated);
+                    updatePlayers(updated, [player.id]);
                     setCurrentPlayer(updated.find(p => p.id === player.id));
                   }
                 }}>
@@ -2018,7 +2028,7 @@ function LeaderboardScreen({ players, results, compact = false }) {
 
 // ─── ADMIN ────────────────────────────────────────────────────────────────────
 
-function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players, updatePlayers }) {
+function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players, updatePlayers, deletePlayers }) {
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState("");
   const [tab, setTab] = useState("scores");
@@ -2076,10 +2086,10 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
       {tab === "ko" && <AdminKO results={results} updateResults={updateResults} />}
       {tab === "phases" && <AdminPhases results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
       {tab === "bonus" && <AdminBonus results={results} updateResults={updateResults} />}
-      {tab === "players" && <AdminPlayers players={players} updatePlayers={updatePlayers} />}
+      {tab === "players" && <AdminPlayers players={players} updatePlayers={updatePlayers} deletePlayers={deletePlayers} />}
       {tab === "detail" && <AdminDetail players={players} results={results} />}
       {tab === "compare" && <AdminCompare players={players} results={results} />}
-      {tab === "test" && <AdminTest results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} />}
+      {tab === "test" && <AdminTest results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} deletePlayers={deletePlayers} />}
     </div>
   );
 }
@@ -2420,7 +2430,9 @@ function AdminPhases({ results, updateResults, players, updatePlayers }) {
         ...p,
         lockedKoPhases: [...new Set([...(p.lockedKoPhases || []), prevPhase])]
       }));
-      updatePlayers(updatedPlayers);
+      // Action légitimement multi-joueurs : on verrouille la phase précédente pour TOUT LE MONDE
+      // à l'avancement du tournoi — on précise explicitement tous les IDs concernés.
+      updatePlayers(updatedPlayers, updatedPlayers.map(p => p.id));
     }
     updateResults({ ...results, openKoPhase: key });
     setConfirmPhase(null);
@@ -2536,7 +2548,7 @@ function AdminBonus({ results, updateResults }) {
   );
 }
 
-function AdminTest({ results, updateResults, players, updatePlayers }) {
+function AdminTest({ results, updateResults, players, updatePlayers, deletePlayers }) {
   const [status, setStatus] = useState("");
 
   function rand(n) { return Math.floor(Math.random() * n); }
@@ -2604,14 +2616,15 @@ function AdminTest({ results, updateResults, players, updatePlayers }) {
       openKoPhase: "none",
     };
 
-    updatePlayers(fakePlayers);
+    updatePlayers(fakePlayers, fakePlayers.map(p => p.id));
     updateResults(testResults);
     setStatus("✅ Données de test chargées ! Rechargez la page pour les voir.");
   }
 
   function clearTestData() {
-    
-    updatePlayers([]);
+    const allIds = players.map(p => p.id);
+    if (allIds.length > 0 && deletePlayers) deletePlayers(allIds);
+    updatePlayers([], []);
     updateResults({ groupResults:{}, koResults:{}, groupRankings:{}, locked:false, openKoPhase:"none" });
     setStatus("🗑️ Données effacées.");
   }
@@ -3055,23 +3068,23 @@ function AdminBracket({ results, updateResults }) {
   );
 }
 
-function AdminPlayers({ players, updatePlayers }) {
+function AdminPlayers({ players, updatePlayers, deletePlayers }) {
   function removePlayer(id) {
     // confirm supprimé (bloqué sur mobile) — action directe
-    updatePlayers(players.filter(p => p.id !== id));
+    // Suppression réelle côté Supabase, pas une réécriture du tableau complet
+    if (deletePlayers) deletePlayers([id]);
+    updatePlayers(players.filter(p => p.id !== id), []); // met à jour le state local, rien à upsert
   }
 
   function unlockPlayer(id) {
-
-    updatePlayers(players.map(p => p.id === id ? { ...p, locked: false } : p));
+    updatePlayers(players.map(p => p.id === id ? { ...p, locked: false } : p), [id]);
   }
 
   function unlockKoPhase(id, phase) {
     const label = { R16: "Seizièmes", R8: "Huitièmes", QF: "Quarts", SF: "Demi-finales", F: "Finale" }[phase];
-
     updatePlayers(players.map(p => p.id === id
       ? { ...p, lockedKoPhases: (p.lockedKoPhases || []).filter(ph => ph !== phase) }
-      : p));
+      : p), [id]);
   }
 
   return (
@@ -3090,7 +3103,7 @@ function AdminPlayers({ players, updatePlayers }) {
             <button style={{ ...styles.btnSecondary, fontSize: 11, padding: "4px 8px" }}
               onClick={() => {
                 const np = prompt(`Nouveau code 4 chiffres pour ${p.name} :`);
-                if (np && /^[0-9]{4}$/.test(np)) { updatePlayers(players.map(pl => pl.id === p.id ? { ...pl, pin: np } : pl)); alert("Code mis à jour !"); }
+                if (np && /^[0-9]{4}$/.test(np)) { updatePlayers(players.map(pl => pl.id === p.id ? { ...pl, pin: np } : pl), [p.id]); alert("Code mis à jour !"); }
                 else if (np) alert("Code invalide (4 chiffres requis)");
               }}>
               🔑 Code
