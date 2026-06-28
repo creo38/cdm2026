@@ -504,7 +504,11 @@ export default function App() {
 
   async function updatePlayers(p) {
     setPlayers(p);
-    await saveData("players", p);
+    const result = await saveData("players", p);
+    if (!result.success) {
+      alert("⚠️ Erreur de sauvegarde ! Tes pronostics n'ont peut-être pas été enregistrés sur le serveur.\n\nDétail : " + result.error + "\n\nVérifie ta connexion internet et réessaye. Ne ferme pas l'appli avant d'avoir revu le message de confirmation.");
+    }
+    return result;
   }
 
   async function updateResults(r) {
@@ -828,7 +832,8 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
 
   const { total, detail } = calcScore(player, results);
 
-  function saveDraft() {
+  async function saveDraft() {
+    setSaved("saving");
     const predictions = Object.entries(preds).map(([matchId, v]) => ({ matchId, home: v.home, away: v.away }));
     const updated = players.map(p => {
       if (p.id !== player.id) return p;
@@ -839,22 +844,31 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
       }
       return { ...p, predictions, koPredictions: koPreds, locked: false };
     });
-    updatePlayers(updated);
-    setCurrentPlayer(updated.find(p => p.id === player.id));
-    setSaved("draft");
-    setTimeout(() => setSaved(false), 2500);
+    const result = await updatePlayers(updated);
+    if (result && result.success) {
+      setCurrentPlayer(updated.find(p => p.id === player.id));
+      setSaved("draft");
+      setTimeout(() => setSaved(false), 2500);
+    } else {
+      setSaved(false);
+    }
   }
 
-  function saveFinal() {
+  async function saveFinal() {
     if (locked) return;
+    setSaved("saving");
     const predictions = Object.entries(preds).map(([matchId, v]) => ({ matchId, home: v.home, away: v.away }));
     const updated = players.map(p => p.id === player.id
       ? { ...p, predictions, koPredictions: koPreds, locked: true }
       : p);
-    updatePlayers(updated);
-    setCurrentPlayer(updated.find(p => p.id === player.id));
-    setSaved("final");
-    setTimeout(() => setSaved(false), 3000);
+    const result = await updatePlayers(updated);
+    if (result && result.success) {
+      setCurrentPlayer(updated.find(p => p.id === player.id));
+      setSaved("final");
+      setTimeout(() => setSaved(false), 3000);
+    } else {
+      setSaved(false);
+    }
   }
 
   // Banner si nouvelle phase ouverte non encore pronostiquée
@@ -964,13 +978,18 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
                 🔒 Tes poules sont verrouillées définitivement. Le bouton ci-dessous sauvegarde uniquement tes pronostics de phase finale.
               </p>
             )}
+            {saved === "saving" && (
+              <p style={{ ...styles.hint, color: "#f59e0b", margin: 0, fontSize: 12, textAlign: "center" }}>
+                ⏳ Sauvegarde en cours… ne quitte pas l'appli !
+              </p>
+            )}
             <div style={{ display: "flex", gap: 8 }}>
-              <button style={{ ...styles.btnSecondary, flex: 1 }} onClick={saveDraft}>
-                {saved === "draft" ? "✅ Brouillon sauvé !" : "💾 Sauvegarder brouillon"}
+              <button style={{ ...styles.btnSecondary, flex: 1 }} onClick={saveDraft} disabled={saved === "saving"}>
+                {saved === "saving" ? "⏳ Patience…" : saved === "draft" ? "✅ Brouillon sauvé !" : "💾 Sauvegarder brouillon"}
               </button>
               {!locked && (
-                <button style={{ ...styles.btnPrimary, flex: 1, background: "#22c55e" }} onClick={saveFinal}>
-                  {saved === "final" ? "🔒 Verrouillé !" : "🔒 Valider définitivement"}
+                <button style={{ ...styles.btnPrimary, flex: 1, background: "#22c55e" }} onClick={saveFinal} disabled={saved === "saving"}>
+                  {saved === "saving" ? "⏳ Patience…" : saved === "final" ? "🔒 Verrouillé !" : "🔒 Valider définitivement"}
                 </button>
               )}
             </div>
@@ -3100,6 +3119,8 @@ function AdminPlayers({ players, updatePlayers }) {
               const label = { R16:"1/16", R8:"1/8", QF:"1/4", SF:"1/2", F:"Finale" }[phase];
               const isLocked = (p.lockedKoPhases || []).includes(phase);
               if (!isLocked) return null;
+              const bracketSize = { R16: 16, R8: 8, QF: 4, SF: 2, F: 1 }[phase];
+              const filledCount = (p.koPredictions?.[phase] || []).filter(pred => pred.winner).length;
               return (
                 <span key={phase} style={{
                   fontSize: 11, padding: "3px 8px", borderRadius: 20,
@@ -3109,7 +3130,7 @@ function AdminPlayers({ players, updatePlayers }) {
                   onClick={() => unlockKoPhase(p.id, phase)}
                   title="Cliquer pour déverrouiller"
                 >
-                  🔒 {label} — cliquer pour déverrouiller
+                  🔒 {label} ({filledCount}/{bracketSize}) — cliquer pour déverrouiller
                 </span>
               );
             })}
