@@ -1292,24 +1292,26 @@ function GroupStandingsCard({ group, groupResults, detail, qualified8 }) {
 
 // ─── TABLEAU FIFA OFFICIEL ────────────────────────────────────────────────────
 
+// Seizièmes de finale (32 → 16 équipes) — RÉSULTATS OFFICIELS CONFIRMÉS le 27 juin 2026
+// Les 32 qualifiés et les 16 affiches sont définitivement connus (Annexe C FIFA verrouillée).
+// Équipes codées en dur pour garantir l'exactitude — plus de calcul automatique sur cette phase.
 const R16_BRACKET = [
-  // Seizièmes de finale (32 → 16 équipes) — Matchs 73-88 selon tableau officiel FIFA CDM 2026
-  { id: "R16_1",  home: { type: "2e",  group: "A" }, away: { type: "2e",  group: "B" } },   // M73
-  { id: "R16_2",  home: { type: "1er", group: "E" }, away: { type: "3e",  slots: ["A","B","C","D","F"] } }, // M74
-  { id: "R16_3",  home: { type: "1er", group: "F" }, away: { type: "2e",  group: "C" } },   // M75
-  { id: "R16_4",  home: { type: "1er", group: "C" }, away: { type: "2e",  group: "F" } },   // M76
-  { id: "R16_5",  home: { type: "1er", group: "I" }, away: { type: "3e",  slots: ["C","D","F","G","H"] } }, // M77
-  { id: "R16_6",  home: { type: "2e",  group: "E" }, away: { type: "2e",  group: "I" } },   // M78
-  { id: "R16_7",  home: { type: "1er", group: "A" }, away: { type: "3e",  slots: ["C","E","F","H","I"] } }, // M79
-  { id: "R16_8",  home: { type: "1er", group: "L" }, away: { type: "3e",  slots: ["E","H","I","J","K"] } }, // M80
-  { id: "R16_9",  home: { type: "1er", group: "D" }, away: { type: "3e",  slots: ["B","E","F","I","J"] } }, // M81
-  { id: "R16_10", home: { type: "1er", group: "G" }, away: { type: "3e",  slots: ["A","E","H","I","J"] } }, // M82
-  { id: "R16_11", home: { type: "2e",  group: "K" }, away: { type: "2e",  group: "L" } },   // M83
-  { id: "R16_12", home: { type: "1er", group: "H" }, away: { type: "2e",  group: "J" } },   // M84
-  { id: "R16_13", home: { type: "1er", group: "B" }, away: { type: "3e",  slots: ["E","F","G","I","J"] } }, // M85
-  { id: "R16_14", home: { type: "1er", group: "J" }, away: { type: "2e",  group: "H" } },   // M86
-  { id: "R16_15", home: { type: "1er", group: "K" }, away: { type: "3e",  slots: ["D","E","I","J","L"] } }, // M87
-  { id: "R16_16", home: { type: "2e",  group: "D" }, away: { type: "2e",  group: "G" } },   // M88
+  { id: "R16_1",  home: { fixed: "Afrique du Sud" }, away: { fixed: "Canada" } },           // M73
+  { id: "R16_2",  home: { fixed: "Allemagne" },      away: { fixed: "Paraguay" } },          // M74 (Paraguay = meilleur 3e Gr.D)
+  { id: "R16_3",  home: { fixed: "Pays-Bas" },       away: { fixed: "Maroc" } },              // M75
+  { id: "R16_4",  home: { fixed: "Brésil" },         away: { fixed: "Japon" } },               // M76
+  { id: "R16_5",  home: { fixed: "France" },         away: { fixed: "Suède" } },               // M77 (Suède = meilleur 3e Gr.F)
+  { id: "R16_6",  home: { fixed: "Côte d'Ivoire" },  away: { fixed: "Norvège" } },             // M78
+  { id: "R16_7",  home: { fixed: "Mexique" },        away: { fixed: "Équateur" } },            // M79 (Équateur = meilleur 3e Gr.E)
+  { id: "R16_8",  home: { fixed: "Angleterre" },     away: { fixed: "RD Congo" } },            // M80 (RD Congo = meilleur 3e Gr.K)
+  { id: "R16_9",  home: { fixed: "États-Unis" },     away: { fixed: "Bosnie-Herzégovine" } },  // M81 (Bosnie = meilleur 3e Gr.B)
+  { id: "R16_10", home: { fixed: "Belgique" },       away: { fixed: "Sénégal" } },             // M82 (Sénégal = meilleur 3e Gr.I)
+  { id: "R16_11", home: { fixed: "Portugal" },       away: { fixed: "Croatie" } },             // M83
+  { id: "R16_12", home: { fixed: "Espagne" },        away: { fixed: "Autriche" } },            // M84
+  { id: "R16_13", home: { fixed: "Suisse" },         away: { fixed: "Algérie" } },             // M85 (Algérie = meilleur 3e Gr.J)
+  { id: "R16_14", home: { fixed: "Argentine" },      away: { fixed: "Cap-Vert" } },            // M86
+  { id: "R16_15", home: { fixed: "Colombie" },       away: { fixed: "Ghana" } },               // M87 (Ghana = meilleur 3e Gr.L)
+  { id: "R16_16", home: { fixed: "Australie" },      away: { fixed: "Égypte" } },              // M88
 ];
 
 const R8_BRACKET = [
@@ -1469,6 +1471,8 @@ function assignThirdPlaces(qualified, bracket) {
 }
 
 function resolveSlot(slot, qualified, koWinners, thirdAssignments = {}, matchId = "", side = "") {
+  // Nom d'équipe fixé en dur (résultat officiel confirmé) — prioritaire sur tout calcul
+  if (slot.fixed) return slot.fixed;
   if (slot.winner) return koWinners[slot.winner] || null;
   if (slot.type === "1er") {
     const q = qualified.find(q => q.rank === "1er" && q.group === slot.group);
