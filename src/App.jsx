@@ -475,7 +475,11 @@ async function saveData(key, value) {
         body: JSON.stringify({ id: "main", data: value }),
       });
     }
-  } catch (e) { console.error("saveData error:", e); }
+    return { success: true };
+  } catch (e) {
+    console.error("saveData error:", e);
+    return { success: false, error: e.message || String(e) };
+  }
 }
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
@@ -505,7 +509,11 @@ export default function App() {
 
   async function updateResults(r) {
     setResults(r);
-    await saveData("results", r);
+    const result = await saveData("results", r);
+    if (!result.success) {
+      alert("⚠️ Erreur de sauvegarde ! Tes modifications n'ont peut-être pas été enregistrées sur le serveur.\n\nDétail : " + result.error + "\n\nRecharge la page pour vérifier, et réessaye si besoin.");
+    }
+    return result;
   }
 
   if (loading) return (
@@ -1736,13 +1744,19 @@ function BonusTab({ player, results, detail }) {
 function GrillesScreen({ players, results, currentPlayer }) {
   const [selectedId, setSelectedId] = useState(null);
 
-  // Seuls les joueurs ayant verrouillé leur grille sont visibles
-  // Joueurs visibles : grille poules verrouillée OU au moins une phase finale verrouillée
-  const lockedPlayers = players.filter(p => p.locked || (p.lockedKoPhases && p.lockedKoPhases.length > 0));
+  // Phases que LE JOUEUR COURANT a lui-même verrouillées — détermine ce qu'il peut voir chez les autres
+  const myLockedPoules = !!currentPlayer?.locked;
+  const myLockedKoPhases = currentPlayer?.lockedKoPhases || [];
+
+  // Joueurs visibles dans la liste : ceux qui ont verrouillé AU MOINS une phase que je peux voir
+  const lockedPlayers = players.filter(p => {
+    if (myLockedPoules && p.locked) return true;
+    return myLockedKoPhases.some(ph => (p.lockedKoPhases || []).includes(ph));
+  });
   const selected = players.find(p => p.id === selectedId);
 
-  // Condition d'accès : être connecté et avoir verrouillé sa propre grille
-  const canView = currentPlayer && (currentPlayer.locked || (currentPlayer.lockedKoPhases && currentPlayer.lockedKoPhases.length > 0));
+  // Condition d'accès générale : avoir verrouillé au moins quelque chose soi-même
+  const canView = currentPlayer && (myLockedPoules || myLockedKoPhases.length > 0);
 
   if (!currentPlayer) return (
     <div style={styles.formWrap}>
@@ -1758,7 +1772,7 @@ function GrillesScreen({ players, results, currentPlayer }) {
       <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: 16 }}>
         <p style={{ color: "#f97316", fontWeight: 700, margin: "0 0 8px" }}>🔒 Accès verrouillé</p>
         <p style={{ color: C.textMuted, fontSize: 13, margin: 0 }}>
-          Tu dois <strong style={{ color: C.text }}>valider définitivement ta grille de poules ou une phase finale</strong> avant de pouvoir consulter les pronostics des autres joueurs.
+          Tu dois <strong style={{ color: C.text }}>valider définitivement ta grille de poules ou une phase finale</strong> avant de pouvoir consulter les pronostics des autres joueurs <strong>pour cette même phase</strong>.
           Cela évite que les grilles des autres influencent tes propres choix !
         </p>
       </div>
@@ -1831,13 +1845,15 @@ function GrillesScreen({ players, results, currentPlayer }) {
         );
       })()}
 
-      {/* Pronos phase finale */}
+      {/* Pronos phase finale — visible uniquement si J'AI MOI-MÊME verrouillé cette phase */}
       {["R16","R8","QF","SF","F"].map(phase => {
         const phasePreds = selected.koPredictions?.[phase] || [];
         const phaseResults = results.koResults?.[phase] || {};
         const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
-        const isLocked = (selected.lockedKoPhases || []).includes(phase);
-        if (!isLocked || phasePreds.length === 0) return null;
+        const theyLocked = (selected.lockedKoPhases || []).includes(phase);
+        const iLockedThisPhase = myLockedKoPhases.includes(phase);
+        // Il faut que LES DEUX joueurs aient verrouillé cette phase précise pour la voir
+        if (!theyLocked || !iLockedThisPhase || phasePreds.length === 0) return null;
         const { detail } = calcScore(selected, results);
         return (
           <div key={phase} style={styles.groupSection}>
@@ -1861,8 +1877,8 @@ function GrillesScreen({ players, results, currentPlayer }) {
         );
       })}
 
-      {/* Scores de poules — groupes avec résultats */}
-      {Object.entries(GROUPS).map(([group]) => {
+      {/* Scores de poules — visibles uniquement si J'AI MOI-MÊME verrouillé mes poules ET que ce joueur a verrouillé les siennes */}
+      {myLockedPoules && selected.locked && Object.entries(GROUPS).map(([group]) => {
         const groupMatches = GROUP_MATCHES.filter(m => m.group === group);
         const hasPreds = groupMatches.some(m => {
           const p = selected.predictions?.find(p => p.matchId === m.id);
@@ -2183,9 +2199,15 @@ function AdminKO({ results, updateResults }) {
     });
   });
 
-  function save() {
-    updateResults({ ...results, koResults: local, confirmedMatches: confirmed, teamOverrides: overrides });
-    setSaved(true); setTimeout(() => setSaved(false), 2000);
+  async function save() {
+    setSaved("saving");
+    const result = await updateResults({ ...results, koResults: local, confirmedMatches: confirmed, teamOverrides: overrides });
+    if (result && result.success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      setSaved(false);
+    }
   }
 
   function setOverride(phaseKey, matchId, side, teamName) {
@@ -2342,7 +2364,12 @@ function AdminKO({ results, updateResults }) {
           })}
         </div>
       ))}
-      <button style={styles.btnPrimary} onClick={save}>{saved ? "✅ Sauvegardé !" : "💾 Sauvegarder"}</button>
+      <button style={styles.btnPrimary} onClick={save} disabled={saved === "saving"}>
+        {saved === "saving" ? "⏳ Sauvegarde en cours…" : saved === true ? "✅ Sauvegardé !" : "💾 Sauvegarder"}
+      </button>
+      <p style={{ ...styles.hint, marginTop: 8, fontSize: 11 }}>
+        ⚠️ Attends bien le message "✅ Sauvegardé !" avant de recharger la page ou de changer d'onglet.
+      </p>
     </div>
   );
 }
