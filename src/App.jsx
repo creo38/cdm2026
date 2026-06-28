@@ -818,11 +818,16 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const { total, detail } = calcScore(player, results);
 
   function saveDraft() {
-    if (locked) return;
     const predictions = Object.entries(preds).map(([matchId, v]) => ({ matchId, home: v.home, away: v.away }));
-    const updated = players.map(p => p.id === player.id
-      ? { ...p, predictions, koPredictions: koPreds, locked: false }
-      : p);
+    const updated = players.map(p => {
+      if (p.id !== player.id) return p;
+      // Si les poules sont déjà verrouillées, on ne touche ni aux predictions ni au statut locked —
+      // on sauvegarde uniquement les pronostics de phase finale (koPreds)
+      if (locked) {
+        return { ...p, koPredictions: koPreds };
+      }
+      return { ...p, predictions, koPredictions: koPreds, locked: false };
+    });
     updatePlayers(updated);
     setCurrentPlayer(updated.find(p => p.id === player.id));
     setSaved("draft");
@@ -941,18 +946,23 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
       )}
 
       <div style={styles.saveBar}>
-        {locked ? (
-          <div style={styles.lockedBanner}>
-            🔒 Pronostics {isLocked ? "verrouillés définitivement" : "verrouillés par l'admin"} — consultation uniquement
-          </div>
-        ) : (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button style={{ ...styles.btnSecondary, flex: 1 }} onClick={saveDraft}>
-              {saved === "draft" ? "✅ Brouillon sauvé !" : "💾 Sauvegarder brouillon"}
-            </button>
-            <button style={{ ...styles.btnPrimary, flex: 1, background: "#22c55e" }} onClick={saveFinal}>
-              {saved === "final" ? "🔒 Verrouillé !" : "🔒 Valider définitivement"}
-            </button>
+        {tab !== "pronos" ? null : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {locked && (
+              <p style={{ ...styles.hint, color: "#22c55e", margin: 0, fontSize: 12 }}>
+                🔒 Tes poules sont verrouillées définitivement. Le bouton ci-dessous sauvegarde uniquement tes pronostics de phase finale.
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={{ ...styles.btnSecondary, flex: 1 }} onClick={saveDraft}>
+                {saved === "draft" ? "✅ Brouillon sauvé !" : "💾 Sauvegarder brouillon"}
+              </button>
+              {!locked && (
+                <button style={{ ...styles.btnPrimary, flex: 1, background: "#22c55e" }} onClick={saveFinal}>
+                  {saved === "final" ? "🔒 Verrouillé !" : "🔒 Valider définitivement"}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -1417,16 +1427,41 @@ function assignThirdPlaces(qualified, bracket) {
   const slots3e = bracket.filter(m => m.away?.type === "3e" || m.home?.type === "3e")
     .map(m => m.away?.type === "3e" ? { matchId: m.id, side: "away", slots: m.away.slots }
                                      : { matchId: m.id, side: "home", slots: m.home.slots });
+
+  if (thirds.length === 0 || slots3e.length === 0) return {};
+
+  // Algorithme d'affectation bipartite : on traite d'abord les slots les PLUS CONTRAINTS
+  // (ceux qui acceptent le moins de groupes possibles), pour éviter qu'un slot peu contraint
+  // ne "vole" une équipe à un slot qui n'avait qu'une seule option possible.
+  const slotsSorted = [...slots3e].sort((a, b) => {
+    const aOptions = thirds.filter(t => a.slots.includes(t.group)).length;
+    const bOptions = thirds.filter(t => b.slots.includes(t.group)).length;
+    return aOptions - bOptions; // moins d'options en premier
+  });
+
   const assigned = {};
   const usedGroups = new Set();
-  // Pour chaque slot 3e, trouver le meilleur 3e disponible dont le groupe est autorisé
-  slots3e.forEach(slot => {
-    const candidate = thirds.find(t => slot.slots.includes(t.group) && !usedGroups.has(t.group));
-    if (candidate) {
-      assigned[slot.matchId + "_" + slot.side] = candidate.team;
-      usedGroups.add(candidate.group);
-    }
+
+  slotsSorted.forEach(slot => {
+    // Parmi les 3es non encore utilisés et éligibles à ce slot,
+    // prendre celui qui a le MOINS d'autres slots possibles (le plus "à risque")
+    const candidates = thirds.filter(t => slot.slots.includes(t.group) && !usedGroups.has(t.group));
+    if (candidates.length === 0) return;
+
+    let best = candidates[0];
+    let bestOptionsCount = Infinity;
+    candidates.forEach(c => {
+      const optionsForThisTeam = slots3e.filter(s => s.slots.includes(c.group)).length;
+      if (optionsForThisTeam < bestOptionsCount) {
+        bestOptionsCount = optionsForThisTeam;
+        best = c;
+      }
+    });
+
+    assigned[slot.matchId + "_" + slot.side] = best.team;
+    usedGroups.add(best.group);
   });
+
   return assigned;
 }
 
@@ -2125,6 +2160,7 @@ function AdminRankings({ results, updateResults }) {
 function AdminKO({ results, updateResults }) {
   const [local, setLocal] = useState(results.koResults || {});
   const [confirmed, setConfirmed] = useState(results.confirmedMatches || {});
+  const [overrides, setOverrides] = useState(results.teamOverrides || {});
   const [saved, setSaved] = useState(false);
 
   // Calcule les qualifiés depuis les vrais scores + overrides de classement
@@ -2141,8 +2177,16 @@ function AdminKO({ results, updateResults }) {
   });
 
   function save() {
-    updateResults({ ...results, koResults: local, confirmedMatches: confirmed });
+    updateResults({ ...results, koResults: local, confirmedMatches: confirmed, teamOverrides: overrides });
     setSaved(true); setTimeout(() => setSaved(false), 2000);
+  }
+
+  function setOverride(phaseKey, matchId, side, teamName) {
+    const key = `${phaseKey}_${matchId}_${side}`;
+    setOverrides(o => {
+      if (!teamName) { const next = { ...o }; delete next[key]; return next; }
+      return { ...o, [key]: teamName };
+    });
   }
 
   function setField(phaseKey, matchId, field, value, homeTeam, awayTeam) {
@@ -2210,10 +2254,11 @@ function AdminKO({ results, updateResults }) {
           {bracket.map((match, idx) => {
             const m = local[key]?.[match.id] || {};
             // Résolution des équipes depuis les qualifiés calculés
-            const homeTeam = resolveSlot(match.home, certain, savedWinners, thirdAssignments, match.id, "home");
-            const awayTeam = resolveSlot(match.away, certain, savedWinners, thirdAssignments, match.id, "away");
+            const homeTeam = overrides[`${key}_${match.id}_home`] || resolveSlot(match.home, certain, savedWinners, thirdAssignments, match.id, "home");
+            const awayTeam = overrides[`${key}_${match.id}_away`] || resolveSlot(match.away, certain, savedWinners, thirdAssignments, match.id, "away");
             const teamsForMatch = [homeTeam, awayTeam].filter(Boolean);
             const isConfirmed = !!confirmed[`${key}_${match.id}`];
+            const hasOverride = !!(overrides[`${key}_${match.id}_home`] || overrides[`${key}_${match.id}_away`]);
             return (
               <div key={match.id} style={{ ...styles.koMatchRow, background: isConfirmed ? "#0d2015" : "transparent" }}>
                 <div style={styles.koMatchHeader}>
@@ -2228,6 +2273,7 @@ function AdminKO({ results, updateResults }) {
                       ? <>{flag(awayTeam)} {awayTeam}</>
                       : <span style={{ color: C.textMuted, fontSize: 11 }}>{slotLabel(match.away)}</span>
                     }
+                    {hasOverride && <span style={{ fontSize: 10, color: "#f59e0b", marginLeft: 6 }}>✏️ corrigé</span>}
                   </span>
                   <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 12, color: "#94a3b8", cursor: "pointer" }}>
                     <input type="checkbox" checked={!!m.penalties}
@@ -2235,6 +2281,21 @@ function AdminKO({ results, updateResults }) {
                     TAB
                   </label>
                 </div>
+
+                {/* Correction manuelle des équipes (si le calcul auto est faux) */}
+                <details style={{ marginBottom: 6 }}>
+                  <summary style={{ fontSize: 11, color: "#f59e0b", cursor: "pointer" }}>✏️ Corriger les équipes manuellement</summary>
+                  <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                    <input style={{ ...styles.input, flex: 1, fontSize: 12, padding: "6px 8px" }}
+                      placeholder="Nom équipe 1 (laisser vide = auto)"
+                      defaultValue={overrides[`${key}_${match.id}_home`] || ""}
+                      onBlur={e => setOverride(key, match.id, "home", e.target.value.trim())} />
+                    <input style={{ ...styles.input, flex: 1, fontSize: 12, padding: "6px 8px" }}
+                      placeholder="Nom équipe 2 (laisser vide = auto)"
+                      defaultValue={overrides[`${key}_${match.id}_away`] || ""}
+                      onBlur={e => setOverride(key, match.id, "away", e.target.value.trim())} />
+                  </div>
+                </details>
 
                 {/* Case de validation manuelle si les deux équipes sont connues */}
                 {teamsForMatch.length === 2 && (
