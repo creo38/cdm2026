@@ -54,6 +54,9 @@ const GROUPS = {
   L: ["Angleterre", "Croatie", "Ghana", "Panama"],
 };
 
+// Liste de toutes les 48 équipes, triée alphabétiquement, pour les menus déroulants
+const ALL_TEAMS_LIST = Object.values(GROUPS).flat().sort((a, b) => a.localeCompare(b));
+
 // 72 matchs de poules — chaque équipe joue 3 matchs dans son groupe
 const GROUP_MATCHES = [];
 Object.entries(GROUPS).forEach(([group, [t0, t1, t2, t3]]) => {
@@ -2286,14 +2289,18 @@ function AdminKO({ results, updateResults }) {
                 <details style={{ marginBottom: 6 }}>
                   <summary style={{ fontSize: 11, color: "#f59e0b", cursor: "pointer" }}>✏️ Corriger les équipes manuellement</summary>
                   <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-                    <input style={{ ...styles.input, flex: 1, fontSize: 12, padding: "6px 8px" }}
-                      placeholder="Nom équipe 1 (laisser vide = auto)"
-                      defaultValue={overrides[`${key}_${match.id}_home`] || ""}
-                      onBlur={e => setOverride(key, match.id, "home", e.target.value.trim())} />
-                    <input style={{ ...styles.input, flex: 1, fontSize: 12, padding: "6px 8px" }}
-                      placeholder="Nom équipe 2 (laisser vide = auto)"
-                      defaultValue={overrides[`${key}_${match.id}_away`] || ""}
-                      onBlur={e => setOverride(key, match.id, "away", e.target.value.trim())} />
+                    <select style={{ ...styles.select, flex: 1, fontSize: 12, padding: "6px 8px" }}
+                      value={overrides[`${key}_${match.id}_home`] || ""}
+                      onChange={e => setOverride(key, match.id, "home", e.target.value)}>
+                      <option value="">-- Équipe 1 (auto) --</option>
+                      {ALL_TEAMS_LIST.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
+                    </select>
+                    <select style={{ ...styles.select, flex: 1, fontSize: 12, padding: "6px 8px" }}
+                      value={overrides[`${key}_${match.id}_away`] || ""}
+                      onChange={e => setOverride(key, match.id, "away", e.target.value)}>
+                      <option value="">-- Équipe 2 (auto) --</option>
+                      {ALL_TEAMS_LIST.map(t => <option key={t} value={t}>{flag(t)} {t}</option>)}
+                    </select>
                   </div>
                 </details>
 
