@@ -499,7 +499,13 @@ export default function App() {
       const p = await loadData("players");
       const r = await loadData("results");
       if (p) setPlayers(p);
-      if (r) setResults(r);
+      if (r) {
+        // Migration : si koGloballyLocked est actif, on le convertit en koAdminLocked
+        if (r.koGloballyLocked && !r.koAdminLocked) {
+          r = { ...r, koAdminLocked: { R16: true, R8: true, QF: true, SF: true, F: true }, koGloballyLocked: false };
+        }
+        setResults(r);
+      }
       setLoading(false);
     })();
   }, []);
@@ -847,8 +853,11 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
   const isLocked = !!player.locked;            // verrou grille de poules (joueur)
   const globalLocked = !!results.locked;        // verrou admin global poules
   const locked = isLocked || globalLocked;      // bloque les poules
-  // Pour les phases KO : un verrou admin DÉDIÉ (results.koGloballyLocked), indépendant des poules
-  const lockedKO = !!results.koGloballyLocked;
+  // Pour les phases KO : verrou admin par phase (results.koAdminLocked = { R16: true, R8: true, ... })
+  // Un joueur ne peut pas saisir une phase si l'admin l'a verrouillée globalement
+  const koAdminLocked = results.koAdminLocked || {};
+  // lockedKO est faux — on utilise koAdminLocked par phase dans KOTab directement
+  const lockedKO = false;
 
   const { total, detail } = calcScore(player, results);
 
@@ -938,7 +947,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
           <div style={styles.sectionLabel}>⚽ Matchs de poules</div>
           <GroupMatchesTab preds={preds} setPreds={setPreds} results={results} detail={detail} locked={locked} />
           <div style={{ ...styles.sectionLabel, marginTop: 16 }}>🏆 Phase finale</div>
-          <KOTab koPreds={koPreds} setKoPreds={setKoPreds} results={results} detail={detail} locked={lockedKO} lockedKoPhases={player.lockedKoPhases || []} />
+          <KOTab koPreds={koPreds} setKoPreds={setKoPreds} results={results} detail={detail} locked={lockedKO} lockedKoPhases={player.lockedKoPhases || []} koAdminLocked={koAdminLocked} />
           {/* Bouton valider la phase KO ouverte */}
           {openPhase !== "none" && !lockedKO && !(player.lockedKoPhases || []).includes(openPhase) && (
             <div style={{ marginTop: 12, padding: "12px 14px", background: "#1a1208", border: "1px solid #f97316", borderRadius: 10 }}>
@@ -1561,7 +1570,7 @@ function calcQualified(groupResults) {
   return q;
 }
 
-function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = [] }) {
+function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = [], koAdminLocked = {} }) {
   const qualified = calcQualified(results.groupResults); // pour scoring
   const certainQualified = calcCertainQualified(results.groupResults); // pour affichage anticipé
   const thirdAssignments = assignThirdPlaces(certainQualified, R16_BRACKET);
@@ -1620,8 +1629,9 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
         const isFuture = openIdx < phaseOrder.indexOf(key) && openPhase !== "none";
         const isNoneOpen = openPhase === "none";
         const phaseAdminLocked = lockedKoPhases.includes(key);
-        // 'locked' ici = lockedKO transmis par PlayerScreen (verrou dédié phase finale, indépendant des poules)
-        const phaseLockedForInput = locked || phaseAdminLocked || (!isOpen);
+        // Verrou admin par phase (koAdminLocked[key]) : bloque cette phase précise pour tous les joueurs
+        const phaseGloballyLocked = !!koAdminLocked[key];
+        const phaseLockedForInput = locked || phaseAdminLocked || phaseGloballyLocked || (!isOpen);
 
         return (
           <div key={key} style={{ ...styles.groupSection, opacity: isFuture ? 0.5 : 1 }}>
@@ -2171,15 +2181,24 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
         </button>
       </div>
 
-      {/* Verrou global phases finales — indépendant du verrou poules */}
-      <div style={{ background: results.koGloballyLocked ? "#0d2015" : "#1a1208", border: `1px solid ${results.koGloballyLocked ? "#22c55e" : "#f59e0b"}`, borderRadius: 10, padding: "10px 14px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-        <span style={{ flex: 1, fontSize: 13, color: results.koGloballyLocked ? "#22c55e" : "#f59e0b" }}>
-          {results.koGloballyLocked ? "🔒 Pronostics de phase finale verrouillés" : "🔓 Pronostics de phase finale ouverts"}
-        </span>
-        <button style={{ ...styles.btnPrimary, width: "auto", background: results.koGloballyLocked ? "#ef4444" : "#22c55e", fontSize: 13, padding: "8px 14px" }}
-          onClick={() => updateResults({ ...results, koGloballyLocked: !results.koGloballyLocked })}>
-          {results.koGloballyLocked ? "🔓 Déverrouiller phase finale" : "🔒 Verrouiller toute la phase finale"}
-        </button>
+      {/* Verrous par phase finale — indépendants du verrou poules */}
+      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+        <p style={{ ...styles.hint, fontSize: 11 }}>Verrouiller une phase empêche <strong>tous</strong> les joueurs de modifier leurs pronostics pour cette phase (utile avant les matchs).</p>
+        {["R16","R8","QF","SF","F"].map(phase => {
+          const label = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+          const isLocked = !!(results.koAdminLocked || {})[phase];
+          return (
+            <div key={phase} style={{ background: isLocked ? "#0d2015" : "#1a1208", border: `1px solid ${isLocked ? "#22c55e" : "#f59e0b"}`, borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ flex: 1, fontSize: 12, color: isLocked ? "#22c55e" : "#f59e0b" }}>
+                {isLocked ? "🔒" : "🔓"} {label}
+              </span>
+              <button style={{ ...styles.btnPrimary, width: "auto", background: isLocked ? "#ef4444" : "#22c55e", fontSize: 11, padding: "6px 10px" }}
+                onClick={() => updateResults({ ...results, koAdminLocked: { ...(results.koAdminLocked || {}), [phase]: !isLocked } })}>
+                {isLocked ? "🔓 Déverrouiller" : "🔒 Verrouiller"}
+              </button>
+            </div>
+          );
+        })}
       </div>
       <div style={styles.tabs}>
         <button style={{ ...styles.tab, ...(tab === "scores" ? styles.tabActive : {}) }} onClick={() => setTab("scores")}>⚽ Scores poules</button>
