@@ -563,6 +563,7 @@ export default function App() {
 function Header({ screen, setScreen, currentPlayer, setCurrentPlayer, adminAuth, setAdminAuth }) {
   return (
     <header style={styles.header}>
+      {/* Ligne 1 : logo + nav principale */}
       <div style={styles.headerInner}>
         <button style={styles.logo} onClick={() => setScreen("home")}>
           <span style={styles.logoIcon}>⚽</span>
@@ -571,14 +572,17 @@ function Header({ screen, setScreen, currentPlayer, setCurrentPlayer, adminAuth,
         </button>
         <nav style={styles.nav}>
           <NavBtn label="🏆 Classement" onClick={() => setScreen("leaderboard")} active={screen === "leaderboard"} />
-          <NavBtn label="📈 Par étape" onClick={() => setScreen("phases")} active={screen === "phases"} />
           {currentPlayer
             ? <NavBtn label={`👤 ${currentPlayer.name.split(" ")[0]}`} onClick={() => setScreen("player")} active={screen === "player"} />
             : <NavBtn label="🎮 Jouer" onClick={() => setScreen("login")} active={screen === "login" || screen === "register"} />
           }
-          <NavBtn label="👁️ Grilles" onClick={() => setScreen("grilles")} active={screen === "grilles"} />
           <NavBtn label="⚙️ Admin" onClick={() => setScreen("admin")} active={screen === "admin"} />
         </nav>
+      </div>
+      {/* Ligne 2 : nav secondaire */}
+      <div style={{ display: "flex", gap: 4, padding: "0 12px 6px", borderTop: `1px solid ${C.border}` }}>
+        <NavBtn label="📈 Par étape" onClick={() => setScreen("phases")} active={screen === "phases"} />
+        <NavBtn label="👁️ Grilles" onClick={() => setScreen("grilles")} active={screen === "grilles"} />
       </div>
     </header>
   );
