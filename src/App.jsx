@@ -501,10 +501,11 @@ export default function App() {
       if (p) setPlayers(p);
       if (r) {
         // Migration : si koGloballyLocked est actif, on le convertit en koAdminLocked
+        let rFinal = r;
         if (r.koGloballyLocked && !r.koAdminLocked) {
-          r = { ...r, koAdminLocked: { R16: true, R8: true, QF: true, SF: true, F: true }, koGloballyLocked: false };
+          rFinal = { ...r, koAdminLocked: { R16: true, R8: true, QF: true, SF: true, F: true }, koGloballyLocked: false };
         }
-        setResults(r);
+        setResults(rFinal);
       }
       setLoading(false);
     })();
