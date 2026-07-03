@@ -1647,8 +1647,11 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
               // Pour l'affichage : équipe validée manuellement par l'admin en priorité absolue,
               // sinon résultat réel, sinon pronostiqué
               const confirmedMatch = (results.confirmedMatches || {})[`${key}_${match.id}`];
-              const homeDisplay = confirmedMatch?.home || homeReal || homePred;
-              const awayDisplay = confirmedMatch?.away || awayReal || awayPred;
+              // Les équipes fixes (codées en dur dans le bracket) sont toujours considérées comme connues
+              const fixedHome = match.home?.fixed;
+              const fixedAway = match.away?.fixed;
+              const homeDisplay = fixedHome || confirmedMatch?.home || homeReal || homePred;
+              const awayDisplay = fixedAway || confirmedMatch?.away || awayReal || awayPred;
               const teamsForSelect = [homeDisplay, awayDisplay].filter(Boolean);
 
               const updatePred = (field, value) => {
