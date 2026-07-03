@@ -551,6 +551,7 @@ export default function App() {
         {screen === "admin" && <AdminScreen adminAuth={adminAuth} setAdminAuth={setAdminAuth} results={results} updateResults={updateResults} players={players} updatePlayers={updatePlayers} deletePlayers={deletePlayers} />}
         {screen === "leaderboard" && <LeaderboardScreen players={players} results={results} />}
         {screen === "grilles" && <GrillesScreen players={players} results={results} currentPlayer={currentPlayer} />}
+        {screen === "phases" && <PhasesScreen players={players} results={results} />}
         {screen === "login" && <LoginScreen players={players} setCurrentPlayer={setCurrentPlayer} setScreen={setScreen} />}
       </main>
     </div>
@@ -570,6 +571,7 @@ function Header({ screen, setScreen, currentPlayer, setCurrentPlayer, adminAuth,
         </button>
         <nav style={styles.nav}>
           <NavBtn label="🏆 Classement" onClick={() => setScreen("leaderboard")} active={screen === "leaderboard"} />
+          <NavBtn label="📈 Par étape" onClick={() => setScreen("phases")} active={screen === "phases"} />
           {currentPlayer
             ? <NavBtn label={`👤 ${currentPlayer.name.split(" ")[0]}`} onClick={() => setScreen("player")} active={screen === "player"} />
             : <NavBtn label="🎮 Jouer" onClick={() => setScreen("login")} active={screen === "login" || screen === "register"} />
@@ -1356,15 +1358,16 @@ const R16_BRACKET = [
 ];
 
 const R8_BRACKET = [
-  // Huitièmes de finale (16 → 8 équipes) — vainqueurs des seizièmes
-  { id: "R8_1", home: { winner: "R16_1"  }, away: { winner: "R16_2"  } },
-  { id: "R8_2", home: { winner: "R16_3"  }, away: { winner: "R16_4"  } },
-  { id: "R8_3", home: { winner: "R16_5"  }, away: { winner: "R16_6"  } },
-  { id: "R8_4", home: { winner: "R16_7"  }, away: { winner: "R16_8"  } },
-  { id: "R8_5", home: { winner: "R16_9"  }, away: { winner: "R16_10" } },
-  { id: "R8_6", home: { winner: "R16_11" }, away: { winner: "R16_12" } },
-  { id: "R8_7", home: { winner: "R16_13" }, away: { winner: "R16_14" } },
-  { id: "R8_8", home: { winner: "R16_15" }, away: { winner: "R16_16" } },
+  // Huitièmes de finale (16 → 8 équipes) — par ordre de date
+  // Sources : CBS Sports, Yahoo Sports, ESPN, Fox Sports (3 juillet 2026)
+  { id: "R8_1", home: { fixed: "Canada" },    away: { fixed: "Maroc" } },           // Sam. 5 juil.
+  { id: "R8_2", home: { fixed: "Paraguay" },  away: { fixed: "France" } },          // Sam. 5 juil.
+  { id: "R8_3", home: { fixed: "Brésil" },    away: { fixed: "Norvège" } },         // Dim. 6 juil.
+  { id: "R8_4", home: { fixed: "Mexique" },   away: { fixed: "Angleterre" } },      // Dim. 6 juil.
+  { id: "R8_5", home: { fixed: "Portugal" },  away: { fixed: "Espagne" } },         // Lun. 7 juil.
+  { id: "R8_6", home: { fixed: "États-Unis" }, away: { fixed: "Belgique" } },       // Lun. 7 juil.
+  { id: "R8_7", home: { winner: "R16_14" },   away: { winner: "R16_16" } },         // Mar. 8 juil. — Argentine/Cap-Vert vs Australie/Égypte (ce soir)
+  { id: "R8_8", home: { winner: "R16_13" },   away: { winner: "R16_15" } },         // Mar. 8 juil. — Suisse/Algérie vs Colombie/Ghana (ce soir)
 ];
 
 const QF_BRACKET = [
@@ -1977,6 +1980,102 @@ function GrillesScreen({ players, results, currentPlayer }) {
           </button>
         ))
       }
+    </div>
+  );
+}
+
+// ─── CLASSEMENT PAR ÉTAPE ────────────────────────────────────────────────────
+
+function PhasesScreen({ players, results }) {
+  const [activePhase, setActivePhase] = useState("poules");
+
+  const phases = [
+    { key: "poules", label: "⚽ Poules" },
+    { key: "R16",    label: "1/16" },
+    { key: "R8",     label: "1/8" },
+    { key: "QF",     label: "1/4" },
+    { key: "SF",     label: "1/2" },
+    { key: "F",      label: "Finale" },
+  ];
+
+  // Calcule les points d'une étape précise pour un joueur
+  function calcPhaseScore(player, phase) {
+    const { detail } = calcScore(player, results);
+    let total = 0;
+
+    if (phase === "poules") {
+      // Matchs de poules + classements de groupes
+      Object.entries(detail).forEach(([k, v]) => {
+        if (!k.startsWith("ko_") && !k.startsWith("rank") && !k.startsWith("bonus")) total += v;
+      });
+      // +2 classements de groupes
+      Object.entries(detail).forEach(([k, v]) => {
+        if (k.startsWith("rank_")) total += v;
+      });
+    } else {
+      // Phase finale spécifique
+      Object.entries(detail).forEach(([k, v]) => {
+        if (k.startsWith(`ko_${phase}_`)) total += v;
+      });
+    }
+    return total;
+  }
+
+  // Classement pour la phase active
+  const ranked = players
+    .map(p => ({ ...p, pts: calcPhaseScore(p, activePhase) }))
+    .sort((a, b) => b.pts - a.pts);
+
+  // Vérifie si une phase a des résultats
+  function phaseHasResults(phase) {
+    if (phase === "poules") return Object.keys(results.groupResults || {}).length > 0;
+    return Object.keys(results.koResults?.[phase] || {}).length > 0;
+  }
+
+  return (
+    <div style={styles.lbWrap}>
+      <h2 style={{ ...styles.formTitle, marginBottom: 12 }}>📈 Classement par étape</h2>
+
+      {/* Onglets de phases */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 16, overflowX: "auto" }}>
+        {phases.map(p => (
+          <button key={p.key} onClick={() => setActivePhase(p.key)} style={{
+            ...styles.tab,
+            ...(activePhase === p.key ? styles.tabActive : {}),
+            opacity: phaseHasResults(p.key) ? 1 : 0.4,
+            fontSize: 12, padding: "8px 12px",
+          }}>
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Classement */}
+      {!phaseHasResults(activePhase) ? (
+        <p style={styles.empty}>⏳ Pas encore de résultats pour cette étape.</p>
+      ) : (
+        <div style={styles.groupSection}>
+          {ranked.map((p, i) => {
+            const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : null;
+            return (
+              <div key={p.id} style={{
+                ...styles.standingsRow,
+                background: i < 3 ? C.surface : "transparent",
+                borderLeft: i < 3 ? `3px solid ${["#f59e0b","#94a3b8","#cd7f32"][i]}` : "3px solid transparent",
+              }}>
+                <span style={{ color: C.textMuted, minWidth: 28, fontSize: 13 }}>
+                  {medal || `${i + 1}.`}
+                </span>
+                <div style={styles.avatarSm}>{getInitials(p.name)}</div>
+                <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{p.name}</span>
+                <span style={{ fontWeight: 800, fontSize: 16, color: p.pts > 0 ? C.accent : C.textMuted }}>
+                  {p.pts > 0 ? `+${p.pts}` : "–"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
