@@ -1907,8 +1907,14 @@ function GrillesScreen({ players, results, currentPlayer }) {
         const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
         const theyLocked = (selected.lockedKoPhases || []).includes(phase);
         const iLockedThisPhase = myLockedKoPhases.includes(phase);
-        // Il faut que LES DEUX joueurs aient verrouillé cette phase précise pour la voir
-        if (!theyLocked || !iLockedThisPhase || phasePreds.length === 0) return null;
+        // On peut voir la grille d'une phase si :
+        // - L'autre joueur a verrouillé cette phase, ET
+        // - Soit j'ai moi-même verrouillé cette phase, soit cette phase est ouverte (passée ou actuelle)
+        const phaseIsOpenOrPast = results.openKoPhase !== "none" &&
+          ["R16","R8","QF","SF","F"].indexOf(phase) <=
+          ["R16","R8","QF","SF","F"].indexOf(results.openKoPhase);
+        const canSeeThisPhase = iLockedThisPhase || phaseIsOpenOrPast;
+        if (!theyLocked || !canSeeThisPhase || phasePreds.length === 0) return null;
         const { detail } = calcScore(selected, results);
         return (
           <div key={phase} style={styles.groupSection}>
