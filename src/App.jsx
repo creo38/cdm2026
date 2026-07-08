@@ -1385,11 +1385,11 @@ const R8_BRACKET = [
 ];
 
 const QF_BRACKET = [
-  // Quarts de finale (8 → 4 équipes) — vainqueurs des huitièmes
-  { id: "QF_1", home: { winner: "R8_1" }, away: { winner: "R8_2" } },
-  { id: "QF_2", home: { winner: "R8_3" }, away: { winner: "R8_4" } },
-  { id: "QF_3", home: { winner: "R8_5" }, away: { winner: "R8_6" } },
-  { id: "QF_4", home: { winner: "R8_7" }, away: { winner: "R8_8" } },
+  // Quarts de finale — vainqueurs des huitièmes confirmés
+  { id: "QF_1", home: { fixed: "Maroc" },     away: { fixed: "France" } },
+  { id: "QF_2", home: { fixed: "Norvège" },   away: { fixed: "Angleterre" } },
+  { id: "QF_3", home: { fixed: "Espagne" },   away: { fixed: "Belgique" } },
+  { id: "QF_4", home: { fixed: "Argentine" }, away: { fixed: "Suisse" } },
 ];
 
 const SF_BRACKET = [
@@ -1630,8 +1630,9 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
         const isFuture = openIdx < phaseOrder.indexOf(key) && openPhase !== "none";
         const isNoneOpen = openPhase === "none";
         const phaseAdminLocked = lockedKoPhases.includes(key);
-        // Verrou admin par phase (koAdminLocked[key]) : bloque cette phase précise pour tous les joueurs
-        const phaseGloballyLocked = !!koAdminLocked[key];
+        // koAdminLocked[key] = verrou admin global pour figer une phase terminée
+        // Ne bloque PAS la phase actuellement ouverte (sinon les joueurs ne peuvent pas saisir)
+        const phaseGloballyLocked = !!koAdminLocked[key] && !isOpen;
         const phaseLockedForInput = locked || phaseAdminLocked || phaseGloballyLocked || (!isOpen);
 
         return (
