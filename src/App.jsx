@@ -1392,11 +1392,7 @@ const QF_BRACKET = [
   { id: "QF_4", home: { fixed: "Argentine" }, away: { fixed: "Suisse" } },
 ];
 
-const SF_BRACKET = [
-  // Demi-finales (4 → 2 équipes)
-  { id: "SF_1", home: { winner: "QF_1" }, away: { winner: "QF_2" } },
-  { id: "SF_2", home: { winner: "QF_3" }, away: { winner: "QF_4" } },
-];
+const SF_BRACKET = [\n  { id: "SF_1", home: { fixed: "France" },     away: { fixed: "Espagne" } },\n  { id: "SF_2", home: { fixed: "Angleterre" }, away: { fixed: "Argentine" } },\n];
 
 const F_BRACKET = [
   // Finale (2 → 1)
@@ -3451,3 +3447,4 @@ const styles = {
   adminWrap: { display: "flex", flexDirection: "column", gap: 16 },
   adminHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
 };
+
