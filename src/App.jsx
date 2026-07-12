@@ -1392,7 +1392,10 @@ const QF_BRACKET = [
   { id: "QF_4", home: { fixed: "Argentine" }, away: { fixed: "Suisse" } },
 ];
 
-const SF_BRACKET = [\n  { id: "SF_1", home: { fixed: "France" },     away: { fixed: "Espagne" } },\n  { id: "SF_2", home: { fixed: "Angleterre" }, away: { fixed: "Argentine" } },\n];
+const SF_BRACKET = [
+  { id: "SF_1", home: { fixed: "France" }, away: { fixed: "Espagne" } },
+  { id: "SF_2", home: { fixed: "Angleterre" }, away: { fixed: "Argentine" } },
+];
 
 const F_BRACKET = [
   // Finale (2 → 1)
