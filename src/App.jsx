@@ -913,7 +913,7 @@ function PlayerScreen({ player, players, updatePlayers, results, updateResults, 
         <div style={{ background: "#1a0d00", border: "1px solid #f97316", borderRadius: 10, padding: "10px 14px", marginBottom: 8 }}>
           <strong style={{ color: "#f97316" }}>🆕 Nouvelle phase ouverte !</strong>
           <p style={{ color: C.textMuted, fontSize: 12, margin: "4px 0 6px" }}>
-            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "R8": "Huitièmes", "QF": "Quarts", "SF": "Demi-finales", "F": "Finale" }[openPhase]}</strong>.
+            Tu peux maintenant pronostiquer les <strong style={{ color: C.text }}>{{ "R16": "Seizièmes", "R8": "Huitièmes", "QF": "Quarts", "SF": "Demi-finales", "TP": "Petite finale", "F": "Finale" }[openPhase]}</strong>.
             Va dans l'onglet "🎯 Pronostics" et n'oublie pas de valider !
           </p>
           <button style={{ ...styles.btnPrimary, width: "auto", fontSize: 12, padding: "6px 12px", background: "#f97316" }}
@@ -1393,13 +1393,19 @@ const QF_BRACKET = [
 ];
 
 const SF_BRACKET = [
-  { id: "SF_1", home: { fixed: "France" }, away: { fixed: "Espagne" } },
-  { id: "SF_2", home: { fixed: "Angleterre" }, away: { fixed: "Argentine" } },
+  // Demi-finales — vainqueurs des quarts confirmés
+  { id: "SF_1", home: { fixed: "France" },    away: { fixed: "Espagne" } },    // Arlington, Texas
+  { id: "SF_2", home: { fixed: "Angleterre" }, away: { fixed: "Argentine" } }, // Atlanta
+];
+
+const TP_BRACKET = [
+  // Petite finale (3e place) — France vs Angleterre
+  { id: "TP_1", home: { fixed: "France" }, away: { fixed: "Angleterre" } },
 ];
 
 const F_BRACKET = [
-  // Finale (2 → 1)
-  { id: "F_1", home: { winner: "SF_1" }, away: { winner: "SF_2" } },
+  // Finale — Espagne vs Argentine
+  { id: "F_1", home: { fixed: "Espagne" }, away: { fixed: "Argentine" } },
 ];
 
 // Retourne les équipes mathématiquement certaines même si le groupe n'est pas terminé
@@ -1581,7 +1587,7 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
   // Dictionnaires vainqueurs réels et pronostiqués pour propagation
   const realWinners = {};
   const predWinners = {};
-  ["R16","R8","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","TP","F"].forEach(phase => {
     Object.entries(results.koResults?.[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) realWinners[mid] = v.winner;
     });
@@ -1597,11 +1603,12 @@ function KOTab({ koPreds, setKoPreds, results, detail, locked, lockedKoPhases = 
     { key: "R8",  label: "Huitièmes de finale", bracket: R8_BRACKET },
     { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
+    { key: "TP",  label: "Petite finale (3e place)", bracket: TP_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
 
   // Ordre des phases pour savoir lesquelles sont "passées"
-  const phaseOrder = ["R16", "R8", "QF", "SF", "F"];
+  const phaseOrder = ["R16", "R8", "QF", "SF", "TP", "F"];
   const openIdx = phaseOrder.indexOf(openPhase);
 
   return (
@@ -1901,18 +1908,18 @@ function GrillesScreen({ players, results, currentPlayer }) {
       })()}
 
       {/* Pronos phase finale — visible uniquement si J'AI MOI-MÊME verrouillé cette phase */}
-      {["R16","R8","QF","SF","F"].map(phase => {
+      {["R16","R8","QF","SF","TP","F"].map(phase => {
         const phasePreds = selected.koPredictions?.[phase] || [];
         const phaseResults = results.koResults?.[phase] || {};
-        const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+        const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", TP:"Petite finale", F:"Finale" }[phase];
         const theyLocked = (selected.lockedKoPhases || []).includes(phase);
         const iLockedThisPhase = myLockedKoPhases.includes(phase);
         // On peut voir la grille d'une phase si :
         // - L'autre joueur a verrouillé cette phase, ET
         // - Soit j'ai moi-même verrouillé cette phase, soit cette phase est ouverte (passée ou actuelle)
         const phaseIsOpenOrPast = results.openKoPhase !== "none" &&
-          ["R16","R8","QF","SF","F"].indexOf(phase) <=
-          ["R16","R8","QF","SF","F"].indexOf(results.openKoPhase);
+          ["R16","R8","QF","SF","TP","F"].indexOf(phase) <=
+          ["R16","R8","QF","SF","TP","F"].indexOf(results.openKoPhase);
         const canSeeThisPhase = iLockedThisPhase || phaseIsOpenOrPast;
         if (!theyLocked || !canSeeThisPhase || phasePreds.length === 0) return null;
         const { detail } = calcScore(selected, results);
@@ -2191,8 +2198,8 @@ function AdminScreen({ adminAuth, setAdminAuth, results, updateResults, players,
       {/* Verrous par phase finale — indépendants du verrou poules */}
       <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
         <p style={{ ...styles.hint, fontSize: 11 }}>Verrouiller une phase empêche <strong>tous</strong> les joueurs de modifier leurs pronostics pour cette phase (utile avant les matchs).</p>
-        {["R16","R8","QF","SF","F"].map(phase => {
-          const label = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+        {["R16","R8","QF","SF","TP","F"].map(phase => {
+          const label = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", TP:"Petite finale", F:"Finale" }[phase];
           const isLocked = !!(results.koAdminLocked || {})[phase];
           return (
             <div key={phase} style={{ background: isLocked ? "#0d2015" : "#1a1208", border: `1px solid ${isLocked ? "#22c55e" : "#f59e0b"}`, borderRadius: 8, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
@@ -2359,7 +2366,7 @@ function AdminKO({ results, updateResults }) {
 
   // Vainqueurs déjà saisis pour la propagation
   const savedWinners = {};
-  ["R16","R8","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","TP","F"].forEach(phase => {
     Object.entries(local[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) savedWinners[mid] = v.winner;
     });
@@ -2428,6 +2435,7 @@ function AdminKO({ results, updateResults }) {
     { key: "R8",  label: "Huitièmes de finale", bracket: R8_BRACKET },
     { key: "QF",  label: "Quarts de finale",    bracket: QF_BRACKET },
     { key: "SF",  label: "Demi-finales",         bracket: SF_BRACKET },
+    { key: "TP",  label: "Petite finale (3e place)", bracket: TP_BRACKET },
     { key: "F",   label: "Finale",               bracket: F_BRACKET },
   ];
 
@@ -2541,14 +2549,15 @@ function AdminKO({ results, updateResults }) {
 }
 
 function AdminPhases({ results, updateResults, players, updatePlayers }) {
-  const phaseOrder = ["none", "R16", "R8", "QF", "SF", "F"];
+  const phaseOrder = ["none", "R16", "R8", "QF", "SF", "TP", "F"];
   const phases = [
     { key: "none", label: "⏳ Phase de poules", desc: "Pronostics phase finale fermés — les joueurs saisissent leurs scores de poules." },
     { key: "R16",  label: "Seizièmes de finale", desc: "Les joueurs pronostiquent les 16 matchs des seizièmes (32→16). Les poules précédentes sont verrouillées." },
     { key: "R8",   label: "Huitièmes de finale", desc: "Les joueurs pronostiquent les 8 huitièmes (16→8). Les seizièmes sont verrouillés." },
     { key: "QF",   label: "Quarts de finale",     desc: "Les joueurs pronostiquent les 4 quarts (8→4). Les huitièmes sont verrouillés." },
     { key: "SF",   label: "Demi-finales",         desc: "Les joueurs pronostiquent les 2 demi-finales (4→2). Les quarts sont verrouillés." },
-    { key: "F",    label: "Finale",               desc: "Les joueurs pronostiquent la finale (2→1). Les demi-finales sont verrouillées." },
+    { key: "TP",   label: "Petite finale (3e place)", desc: "France vs Angleterre — match pour la 3e place." },
+    { key: "F",    label: "Finale",               desc: "Espagne vs Argentine — finale du Mondial (2→1). Les demi-finales sont verrouillées." },
   ];
   const current = results.openKoPhase || "none";
   const currentIdx = phaseOrder.indexOf(current);
@@ -3073,8 +3082,8 @@ function AdminDetail({ players, results }) {
       {koTotal > 0 && (
         <div style={styles.groupSection}>
           <h3 style={styles.groupTitle}>🏆 Détail phase finale</h3>
-          {["R16","R8","QF","SF","F"].map(phase => {
-            const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", F:"Finale" }[phase];
+          {["R16","R8","QF","SF","TP","F"].map(phase => {
+            const phaseLabel = { R16:"Seizièmes", R8:"Huitièmes", QF:"Quarts", SF:"Demi-finales", TP:"Petite finale", F:"Finale" }[phase];
             const phaseResults = results.koResults?.[phase] || {};
             const phasePreds = player.koPredictions?.[phase] || [];
             const phasePts = Object.entries(detail).filter(([k,v]) => k.startsWith(`ko_${phase}_`) && v > 0);
@@ -3133,7 +3142,7 @@ function AdminBracket({ results, updateResults }) {
 
   // Vainqueurs réels saisis
   const realWinners = {};
-  ["R16","R8","QF","SF","F"].forEach(phase => {
+  ["R16","R8","QF","SF","TP","F"].forEach(phase => {
     Object.entries(results.koResults?.[phase] || {}).forEach(([mid, v]) => {
       if (v?.winner) realWinners[mid] = v.winner;
     });
@@ -3265,8 +3274,8 @@ function AdminPlayers({ players, updatePlayers, deletePlayers }) {
             </span>
 
             {/* Verrous phases finale */}
-            {["R16","R8","QF","SF","F"].map(phase => {
-              const label = { R16:"1/16", R8:"1/8", QF:"1/4", SF:"1/2", F:"Finale" }[phase];
+            {["R16","R8","QF","SF","TP","F"].map(phase => {
+              const label = { R16:"1/16", R8:"1/8", QF:"1/4", SF:"1/2", TP:"3e place", F:"Finale" }[phase];
               const isLocked = (p.lockedKoPhases || []).includes(phase);
               if (!isLocked) return null;
               const bracketSize = { R16: 16, R8: 8, QF: 4, SF: 2, F: 1 }[phase];
@@ -3450,4 +3459,3 @@ const styles = {
   adminWrap: { display: "flex", flexDirection: "column", gap: 16 },
   adminHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
 };
-
